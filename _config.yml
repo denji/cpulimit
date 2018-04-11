@@ -1,0 +1,8 @@
+title: Cpulimit
+description: CPU usage limiter for Linux, macOS, *BSD
+google_analytics: 
+show_downloads: true
+theme: jekyll-theme-minimal
+
+gems:
+  - jekyll-mentions
