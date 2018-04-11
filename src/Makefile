@@ -1,18 +1,39 @@
-CC?=gcc
-CFLAGS?=-Wall -g -D_GNU_SOURCE
-TARGETS=cpulimit
-LIBS=list.o process_iterator.o process_group.o
-
-UNAME := $(shell uname)
+BINDIR     ?= $(PREFIX)/bin
+BIN_TARGET  = cpulimit
+CC         ?=  gcc
+CFLAGS     ?= -O2 -Wall -g -D_GNU_SOURCE
+HELP2MAN   := $(shell which help2man)
+LIBS        = list.o process_iterator.o process_group.o
+MAN_NAME   := "CPU Utilization Limiter"
+MAN_SEC    := 1
+MAN_SRC    := $(shell git remote get-url origin)
+MAN_TARGET  = $(BIN_TARGET).$(MAN_SEC)
+PREFIX     ?= /usr/local
+STRIP      := $(shell which strip)
+SUDO       := $(shell which sudo)
+TARGETS     = $(BIN_TARGET) $(MAN_TARGET)
+UNAME      := $(shell uname)
 
 ifeq ($(UNAME), FreeBSD)
-LIBS+=-lkvm
+LIBS       += -lkvm
 endif
 
 all::	$(TARGETS) $(LIBS)
 
-cpulimit:	cpulimit.c $(LIBS)
+static:
+	$(MAKE) all CFLAGS="$(CFLAGS) --static"
+
+strip: $(BIN_TARGET)
+	$(STRIP) $<
+
+install: $(TARGETS)
+	$(SUDO) install $^ $(BINDIR)
+
+$(BIN_TARGET):	cpulimit.c $(LIBS)
 	$(CC) -o cpulimit cpulimit.c $(LIBS) $(CFLAGS)
+
+$(MAN_TARGET): $(BIN_TARGET) $(HELP2MAN)
+	$(HELP2MAN) -n $(MAN_NAME) -s $(MAN_SEC) -s $(MAN_SRC) -N ./$< > $@
 
 process_iterator.o: process_iterator.c process_iterator.h
 	$(CC) -c process_iterator.c $(CFLAGS)
