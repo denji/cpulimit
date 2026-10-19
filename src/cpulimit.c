@@ -49,7 +49,7 @@
 #include "process_group.h"
 #include "util.h"
 
-#define MAX_PRIORITY -10
+#define MAX_PRIORITY (-10)
 
 /* GLOBAL VARIABLES */
 
@@ -402,7 +402,7 @@ static void run_command(const struct cli_config *cfg, char **argv, int argc, dou
         perror("Error");
         exit(ret);
     }
-    free(cmd_args);
+    free((void *)cmd_args);
     //parent code: it is the limiter, and the target is its child, so it learns how the target
     //ended from waitpid() and there is no second process that could be left behind
     if (verbose) {

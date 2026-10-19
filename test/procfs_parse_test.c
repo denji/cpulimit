@@ -136,6 +136,8 @@ static void test_ticks_to_ms(void) {
     CHECK(ticks_to_ms(12345, -5) == 0);
     CHECK(ticks_to_ms(UINT64_MAX, 100) == INT64_MAX);  /* saturates instead of wrapping */
     CHECK(ticks_to_ms((uint64_t)INT64_MAX, 1) == INT64_MAX);
+    CHECK(ticks_to_ms(9223372036854775809ULL, 1000) == INT64_MAX);   /* 2^63+1 at 1000 Hz stepped past INT64_MAX */
+    CHECK(ticks_to_ms(9223372036854775807ULL, 1000) == 9223372036854775LL * 1000 + 807);
     /* hz so large that rest * 1000 overflows 64 bits: the answer is still exact */
     CHECK(ticks_to_ms((uint64_t)LONG_MAX / 2, LONG_MAX) == 499);   /* 0.4999.. s */
     CHECK(ticks_to_ms((uint64_t)LONG_MAX - 1, LONG_MAX) == 999);

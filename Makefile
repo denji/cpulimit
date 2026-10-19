@@ -54,7 +54,7 @@ else
 MAN_FILE :=
 endif
 
-.PHONY: stress bench fuzz-standalone fuzz-libfuzzer coverage all check test man install uninstall static static-install static_install \
+.PHONY: analyze verif-sim verif-cbmc stress bench fuzz-standalone fuzz-libfuzzer coverage all check test man install uninstall static static-install static_install \
         strip clean distclean FORCE
 
 all: $(BIN) $(MAN_FILE)
@@ -180,6 +180,25 @@ bench: all $(BUILD)/test/busy
 	sh bench/bench.sh $(BASELINE) $(BIN) $(BUILD)/test/busy $(BENCH_SECONDS)
 
 BENCH_SECONDS ?= 8
+
+# ---- static analysis and verification -------------------------------------------------------
+# Platform iterators other than the one this host builds are not analysable here.
+ANALYZE_SRCS := $(filter-out $(SRCDIR)/process_iterator_%.c,$(wildcard $(SRCDIR)/*.c))
+
+# gcc -fanalyzer is a hard gate; clang-tidy runs when installed (config in .clang-tidy).
+analyze:
+	@set -e; for f in $(ANALYZE_SRCS); do \
+	    out=$$($(CC) -fanalyzer -O1 -Wall -Wextra $(ALL_CPPFLAGS) -c $$f -o /dev/null 2>&1) || { echo "$$out"; exit 1; }; \
+	    if [ -n "$$out" ]; then echo "$$out"; exit 1; fi; done; echo "gcc -fanalyzer: clean"
+	@if command -v clang-tidy >/dev/null 2>&1; then clang-tidy -quiet $(ANALYZE_SRCS) -- $(ALL_CPPFLAGS) && echo "clang-tidy: clean"; \
+	 else echo "clang-tidy not installed, skipped"; fi
+
+# Properties of the pure functions: random testing here, proof for a bound under CBMC.
+verif-sim:
+	CC=$(CC) BUILD=$(BUILD) sh scripts/verif.sh sim
+
+verif-cbmc:
+	BUILD=$(BUILD) sh scripts/verif.sh cbmc
 
 # ---- coverage ------------------------------------------------------------------------------
 # Builds with gcov instrumentation in its own directory, runs the whole test suite and prints

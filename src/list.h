@@ -19,9 +19,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-#ifndef __LIST__
+#ifndef CPULIMIT_LIST_H
 
-#define __LIST__
+#define CPULIMIT_LIST_H
 
 #ifndef  TRUE
     #define TRUE 1

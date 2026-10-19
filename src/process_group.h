@@ -19,9 +19,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-#ifndef __PROCESS_GROUP_H
+#ifndef CPULIMIT_PROCESS_GROUP_H
 
-#define __PROCESS_GROUP_H
+#define CPULIMIT_PROCESS_GROUP_H
 
 #include <stdint.h>
 

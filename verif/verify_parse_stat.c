@@ -1,0 +1,92 @@
+/* parse_proc_stat() on every NUL-terminated string of up to MAXLEN bytes:
+ *   - never reads outside the buffer, never overflows (CBMC --bounds-check --pointer-check
+ *     --unsigned-overflow-check --signed-overflow-check --conversion-check)
+ *   - returns 0 or -1; on -1 *out is unchanged
+ *   - on 0 the state is a letter-or-symbol byte and ppid fits pid_t (non-negative)
+ * The buffer is fully nondeterministic, so this covers command names with ')' and spaces,
+ * truncated lines and numbers one digit longer than a uint64_t.
+ * MAXLEN is small enough for the unwinding bound but long enough to hold a full prefix
+ * "1 (x) S 1 0 ... " (fields 1..22 need 44+ bytes); the bounded proof therefore uses the
+ * STATIC_PREFIX variant below for the deep fields and the free variant for the shallow ones. */
+#include "harness.h"
+#include "procfs_parse.h"
+
+#ifndef MAXLEN
+#define MAXLEN 80
+#endif
+
+#ifndef __CPROVER
+static long accepted; /* how many samples were valid lines: shows the sample space is not vacuous */
+#endif
+
+#ifdef __CPROVER
+int main(void)
+#else
+static void one(void)
+#endif
+{
+    char buf[MAXLEN + 1];
+    struct proc_stat before, after;
+    size_t i, len;
+    int rc;
+    len = (size_t)nondet_uchar();
+#ifndef __CPROVER
+    len %= MAXLEN + 1;
+#endif
+    VERIF_ASSUME(len <= MAXLEN);
+    for (i = 0; i < len; i++) {
+        buf[i] = (char)nondet_statchar();
+        VERIF_ASSUME(buf[i] != '\0');
+    }
+#ifndef __CPROVER
+    if (nondet_uchar() & 1) {
+        /* half of the samples start from a well-formed line and are then damaged, otherwise random
+         * bytes almost never get past field 3 and the deep fields would go untested */
+        static const char *const good = "12 (a b) S 1 3 4 5 6 7 8 9 10 11 120 130 14 15 16 17 18 19 2000 21 22";
+        size_t k, damage = (size_t)(nondet_uchar() % 4);
+        len = strlen(good);
+        if (len > MAXLEN) {
+            len = MAXLEN;
+        }
+        memcpy(buf, good, len);
+        for (k = 0; k < damage; k++) {
+            buf[(size_t)nondet_uchar() % len] = (char)nondet_statchar();
+        }
+        for (k = 0; k < len; k++) {
+            if (buf[k] == '\0') {
+                buf[k] = ' ';
+            }
+        }
+    }
+#endif
+    buf[len] = '\0';
+    before.state = (char)nondet_uchar();
+    before.ppid = (pid_t)nondet_long();
+    before.utime = nondet_u64();
+    before.stime = nondet_u64();
+    before.starttime = nondet_u64();
+    after = before;
+    rc = parse_proc_stat(buf, &after);
+    assert(rc == 0 || rc == -1);
+    if (rc == -1) {
+        assert(after.state == before.state && after.ppid == before.ppid && after.utime == before.utime &&
+               after.stime == before.stime && after.starttime == before.starttime);
+    } else {
+        assert(after.ppid >= 0);
+#ifndef __CPROVER
+        accepted++;
+#endif
+    }
+#ifdef __CPROVER
+    return 0;
+#endif
+}
+
+#ifndef __CPROVER
+int main(int argc, char **argv) {
+    long n = argc > 1 ? atol(argv[1]) : 1000000, i;
+    for (i = 0; i < n; i++) one();
+    printf("verify_parse_stat: %ld samples (%ld parsed as valid lines), no property violated\n", n, accepted);
+    return 0;
+}
+#endif

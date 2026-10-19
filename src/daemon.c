@@ -115,7 +115,7 @@ static int write_pidfile(const char *pidfile) {
         return -1;
     }
     if (strlen(pidfile) < sizeof(owned_pidfile)) {
-        strcpy(owned_pidfile, pidfile);
+        memcpy(owned_pidfile, pidfile, strlen(pidfile) + 1);
         atexit(remove_owned_pidfile);
     }
     return 0;

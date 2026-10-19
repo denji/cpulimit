@@ -115,6 +115,12 @@ int parse_proc_stat(const char *buf, struct proc_stat *out) {
     return 0;
 }
 
+/* seconds * 1000 is at most about 9.2e18 here and the fraction adds < 1000, which can still step
+ * past INT64_MAX (found by verif/verify_ticks.c: ticks = 2^63 + 1, hz = 1000), so clamp the sum. */
+static int64_t clamp_ms(uint64_t ms) {
+    return ms > (uint64_t)INT64_MAX ? INT64_MAX : (int64_t)ms;
+}
+
 int64_t ticks_to_ms(uint64_t ticks, long clk_tck) {
     uint64_t hz, seconds, rest;
     if (clk_tck <= 0) {
@@ -127,7 +133,7 @@ int64_t ticks_to_ms(uint64_t ticks, long clk_tck) {
         return INT64_MAX;
     }
     if (rest <= UINT64_MAX / 1000u) {
-        return (int64_t)(seconds * 1000u + rest * 1000u / hz);
+        return clamp_ms(seconds * 1000u + rest * 1000u / hz);
     }
     {
         /* Only for an absurd clock rate (hz > 1.8e16): rest * 1000 does not fit in 64 bits, so
@@ -141,6 +147,6 @@ int64_t ticks_to_ms(uint64_t ticks, long clk_tck) {
                 q++;
             }
         }
-        return (int64_t)(seconds * 1000u + q);
+        return clamp_ms(seconds * 1000u + q);
     }
 }

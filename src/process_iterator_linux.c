@@ -183,7 +183,8 @@ int init_process_iterator(struct process_iterator *it, struct process_filter *fi
         return 0;
     }
     //open a directory stream to /proc directory
-    if ((it->dip = opendir("/proc")) == NULL) {
+    it->dip = opendir("/proc");
+    if (it->dip == NULL) {
         perror("opendir");
         it->mode = IT_DONE;
         return -1;

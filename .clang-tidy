@@ -1,0 +1,26 @@
+# Run with `make analyze`. Every disabled check has a reason:
+#  - clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling: wants the optional C11
+#    Annex K (*_s functions), which glibc/musl/BSD libc do not provide.
+#  - clang-analyzer-valist.Uninitialized: false positive on the va_start()/va_end() pairs in
+#    log.c report(); the list is started before every use (checked by hand and by -fanalyzer).
+#  - bugprone-suspicious-include: process_iterator.c deliberately includes the one platform
+#    implementation selected by the preprocessor.
+#  - concurrency-mt-unsafe: the program is single-threaded; getopt/strerror/localtime are fine.
+#  - bugprone-easily-swappable-parameters, bugprone-narrowing-conversions: noise on small
+#    numeric helpers; the conversions that matter are range-checked and fuzzed.
+#  - cert-err33-c: unchecked printf/fprintf to stderr is deliberate (nothing to do on failure).
+Checks: >
+  clang-analyzer-*,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
+  -clang-analyzer-valist.Uninitialized,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  -bugprone-suspicious-include,
+  cert-*,
+  -cert-err33-c,
+  concurrency-*,
+  -concurrency-mt-unsafe,
+  posix-*
+WarningsAsErrors: '*'
+HeaderFilterRegex: 'src/.*'
