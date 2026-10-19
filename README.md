@@ -77,10 +77,10 @@ Behavior that scripts may depend on (log lines, exit statuses, `-p/-e/-l/-c/-i/-
 | Process identity | pid only: a reused pid was limited as if it were the target | pid + start time |
 | Waiting | `nanosleep` loop, signals handled in the handler | flag-only handler, signals blocked except in `pselect()` (no lost-wakeup window) |
 | Clock | wall clock | `CLOCK_MONOTONIC` |
-| Linux `/proc` | `sscanf`-style parsing, 32-bit times | parser anchored on the last `)`, 64-bit, zombies skipped, command read only when needed |
+| Linux `/proc` | tokenised with `atoi` (32-bit, no overflow or error check) | parser anchored on the last `)`, strict 64-bit, zombies skipped, command read only when needed |
 | Memory | unchecked `malloc` | checked allocations on every path, failure-injection tested |
 | Daemon, syslog, lock, pid file, `--no-boost` | none | added ([issue #1](https://github.com/denji/cpulimit/issues/1)) |
-| Kernel time | sampled and rescanned every cycle | `-i` descendant scan builds one sorted edge table; ~2.4x fewer syscalls and ~2x less limiter CPU with 200 children (below) |
+| System calls / limiter CPU | see benchmarks | ~2.4x fewer syscalls per second and ~2x less limiter CPU with 200 children (below); the `-i` scan builds one sorted parent table instead of walking `/proc` per process |
 | Build | recursive Makefiles, Travis | one Makefile, GitHub Actions |
 
 The design is described, with the invariants the code is tested against, in
@@ -136,8 +136,8 @@ a point or two as noise.
   slice, the target stays stopped; send it `SIGCONT`. No user-space design avoids this.
 * Between reading a process and signalling it, its pid can be recycled. Identity by start time
   closes the long window; a window of one control cycle remains.
-* A multi-threaded target is limited as a whole, not per thread; a 2-thread busy loop at 50 %
-  measured about 42 % of one CPU in a single run.
+* A multi-threaded target is limited as a whole, not per thread. A 2-thread busy loop at `-l 50`
+  measured 53-54 % of one CPU over 10 s, with the old and the new binary alike.
 * `-m` takes a fraction of a CPU (0.05), unlike `-l`, which is a percentage.
 
 ## Contributing
