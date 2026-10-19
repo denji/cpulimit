@@ -54,7 +54,7 @@ else
 MAN_FILE :=
 endif
 
-.PHONY: fuzz-standalone fuzz-libfuzzer coverage all check test man install uninstall static static-install static_install \
+.PHONY: stress bench fuzz-standalone fuzz-libfuzzer coverage all check test man install uninstall static static-install static_install \
         strip clean distclean FORCE
 
 all: $(BIN) $(MAN_FILE)
@@ -169,6 +169,17 @@ fuzz-libfuzzer:
 	    -o $(BUILD)/fuzz/fuzz_procfs_parse $(FUZZ_DIR)/fuzz_procfs_parse.c $(FUZZ_SRC_procfs)
 	clang $(ALL_CPPFLAGS) -O1 -g -fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined \
 	    -o $(BUILD)/fuzz/fuzz_cli $(FUZZ_DIR)/fuzz_cli.c $(FUZZ_SRC_cli) -lm
+
+# ---- load, memory and benchmark ---------------------------------------------------------------
+stress: all $(BUILD)/test/busy
+	BUILD=$(BUILD) sh $(TESTDIR)/stress_test.sh
+
+# BASELINE=/path/to/other/cpulimit  make bench
+bench: all $(BUILD)/test/busy
+	@test -n "$(BASELINE)" || { echo "bench: set BASELINE=<path to the binary to compare against>" >&2; exit 1; }
+	sh bench/bench.sh $(BASELINE) $(BIN) $(BUILD)/test/busy $(BENCH_SECONDS)
+
+BENCH_SECONDS ?= 8
 
 # ---- coverage ------------------------------------------------------------------------------
 # Builds with gcov instrumentation in its own directory, runs the whole test suite and prints
