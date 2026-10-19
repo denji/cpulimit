@@ -23,6 +23,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/select.h>
 
 #include "util.h"
 
@@ -110,4 +111,24 @@ int sleep_ns(int64_t ns) {
     }
     ts = ns_to_timespec(ns);
     return nanosleep(&ts, NULL) == 0 ? 0 : -1;
+}
+
+int wait_ns(int64_t ns, const sigset_t *unblocked) {
+    struct timespec ts;
+    if (ns <= 0) {
+        return 0;
+    }
+    if (unblocked == NULL) {
+        return sleep_ns(ns);
+    }
+    ts = ns_to_timespec(ns);
+    /* no descriptors: this is only a sleep whose signal mask is switched atomically */
+    return pselect(0, NULL, NULL, NULL, &ts, unblocked) == 0 ? 0 : -1;
+}
+
+int pid_in_range(long pid, long pid_max) {
+    if (pid <= 1) {
+        return 0;
+    }
+    return pid_max <= 0 || pid < pid_max;
 }

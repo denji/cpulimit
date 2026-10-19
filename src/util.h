@@ -21,6 +21,7 @@
 #ifndef CPULIMIT_UTIL_H
 #define CPULIMIT_UTIL_H
 
+#include <signal.h>
 #include <stdint.h>
 #include <time.h>
 
@@ -55,5 +56,21 @@ struct timespec ns_to_timespec(int64_t ns);
  * -1 when interrupted by a signal, so the caller can check its stop flag.
  */
 int sleep_ns(int64_t ns);
+
+/*
+ * Like sleep_ns(), but the signal mask is replaced by *unblocked for the
+ * duration of the wait, atomically (pselect). A caller that keeps its stop
+ * signals blocked and passes the mask WITHOUT them here cannot lose a signal
+ * that arrives between its flag check and the sleep: it is delivered inside the
+ * wait and ends it with -1. With unblocked == NULL this is sleep_ns().
+ */
+int wait_ns(int64_t ns, const sigset_t *unblocked);
+
+/*
+ * Is pid a valid target pid? pid_max is the kernel limit (pids are below it) or
+ * <= 0 when it could not be determined, in which case only the lower bound is
+ * checked: an unreadable limit must not make every pid invalid.
+ */
+int pid_in_range(long pid, long pid_max);
 
 #endif

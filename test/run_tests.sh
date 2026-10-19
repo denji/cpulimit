@@ -28,7 +28,15 @@ run util_test "$BUILD/test/util_test"
 run limiter_test "$BUILD/test/limiter_test"
 run procfs_parse_test "$BUILD/test/procfs_parse_test"
 run group_test "$BUILD/test/group_test"
+run cli_parse_test "$BUILD/test/cli_parse_test"
+run lock_test "$BUILD/test/lock_test"
 run cli_test env BUILD="$BUILD" sh "$dir/cli_test.sh"
+# a hung test must fail the run, not hang it
+if command -v timeout >/dev/null 2>&1; then
+    run integration_test timeout 600 env BUILD="$BUILD" sh "$dir/integration_test.sh"
+else
+    run integration_test env BUILD="$BUILD" sh "$dir/integration_test.sh"
+fi
 
 printf '\n%d test(s), %d failed\n' "$total" "$failed"
 [ "$failed" -eq 0 ]

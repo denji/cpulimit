@@ -70,6 +70,9 @@ int find_process_by_name(const char *process_name) {
     init_process_iterator(&it, &filter);
     while (get_next_process(&it, &proc) != -1) {
         const char *command = by_path ? proc.command : base_name(proc.command);
+        if (proc.pid == getpid()) {
+            continue;  //never match ourselves: "-e cpu" would otherwise find cpulimit itself
+        }
         if (strncmp(command, process_name, len) != 0) {
             continue;
         }

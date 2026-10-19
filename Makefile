@@ -40,9 +40,11 @@ LDLIBS_PLAT += -lkvm
 endif
 
 LIB_OBJS   := $(addprefix $(BUILD)/,list.o process_iterator.o process_group.o util.o limiter.o procfs_parse.o)
+# modules used by the executable only (they pull in syslog, fork, fcntl and the CLI)
+APP_OBJS   := $(addprefix $(BUILD)/,cli.o lock.o daemon.o log.o)
 MAIN_OBJ   := $(BUILD)/cpulimit.o
-UNIT_TESTS := process_iterator_test util_test limiter_test procfs_parse_test group_test
-TEST_BINS  := $(addprefix $(BUILD)/test/,$(UNIT_TESTS) busy)
+UNIT_TESTS := process_iterator_test util_test limiter_test procfs_parse_test group_test cli_parse_test lock_test
+TEST_BINS  := $(addprefix $(BUILD)/test/,$(UNIT_TESTS) busy spawn)
 
 HAVE_HELP2MAN := $(shell command -v $(HELP2MAN) 2>/dev/null)
 ifneq ($(HAVE_HELP2MAN),)
@@ -66,11 +68,11 @@ $(BUILD)/.flags: FORCE
 $(BUILD)/%.o: $(SRCDIR)/%.c $(BUILD)/.flags
 	$(CC) $(ALL_CPPFLAGS) -MMD -MP $(ALL_CFLAGS) -c -o $@ $<
 
-$(BIN): $(MAIN_OBJ) $(LIB_OBJS)
-	$(CC) -o $@ $(MAIN_OBJ) $(LIB_OBJS) $(LDFLAGS) $(LDLIBS_PLAT)
+$(BIN): $(MAIN_OBJ) $(APP_OBJS) $(LIB_OBJS)
+	$(CC) -o $@ $(MAIN_OBJ) $(APP_OBJS) $(LIB_OBJS) $(LDFLAGS) $(LDLIBS_PLAT)
 
-$(BUILD)/test/%_test: $(TESTDIR)/%_test.c $(LIB_OBJS) $(BUILD)/.flags
-	$(CC) $(ALL_CPPFLAGS) -I$(TESTDIR) -UNDEBUG -MMD -MP $(ALL_CFLAGS) -o $@ $< $(LIB_OBJS) $(LDFLAGS) $(LDLIBS_PLAT)
+$(BUILD)/test/%_test: $(TESTDIR)/%_test.c $(APP_OBJS) $(LIB_OBJS) $(BUILD)/.flags
+	$(CC) $(ALL_CPPFLAGS) -I$(TESTDIR) -UNDEBUG -MMD -MP $(ALL_CFLAGS) -o $@ $< $(APP_OBJS) $(LIB_OBJS) $(LDFLAGS) $(LDLIBS_PLAT)
 
 # The group tests run process_group.c against a scripted iterator and an allocator that can
 # fail on demand, so list.c and process_group.c are rebuilt here with the allocation seam on.
@@ -85,6 +87,9 @@ $(BUILD)/test/group_test: $(TESTDIR)/group_test.c $(TESTDIR)/fake_iterator.c $(T
 
 $(BUILD)/test/busy: $(TESTDIR)/busy.c $(BUILD)/.flags
 	$(CC) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -o $@ $< $(LDFLAGS) -lpthread
+
+$(BUILD)/test/spawn: $(TESTDIR)/spawn.c $(BUILD)/.flags
+	$(CC) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -o $@ $< $(LDFLAGS)
 
 ifneq ($(MAN_FILE),)
 $(MAN_FILE): $(BIN)

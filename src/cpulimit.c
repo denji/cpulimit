@@ -25,94 +25,98 @@
  *
  * Get the latest version at: http://github.com/denji/cpulimit
  *
+ * Design and invariants: docs/ARCHITECTURE.md
  */
 
+#include <errno.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <getopt.h>
-#include <time.h>
-#include <signal.h>
 #include <string.h>
-#include <errno.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <sys/time.h>
-/*  This breaks under musl and isn't necessary under glibc
-#ifndef __sun__
-#include <sys/sysctl.h>
-#endif
-*/
 #include <sys/resource.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <time.h>
+#include <unistd.h>
 
-#if defined(__APPLE__) || defined(__FREEBSD__)
-    #include <libgen.h>
-#endif
-
-#include <float.h>
-#include <limits.h>
-
-#include "process_group.h"
-#include "list.h"
-#include "util.h"
+#include "cli.h"
+#include "daemon.h"
 #include "limiter.h"
-
-#ifdef HAVE_SYS_SYSINFO_H
-    #include <sys/sysinfo.h>
-#endif
-
-#ifdef __APPLE__
-    #include "memrchr.c"
-#endif
-
-//some useful macro
-#ifndef MIN
-    #define MIN(a,b) (((a)<(b))?(a):(b))
-#endif
-#ifndef MAX
-    #define MAX(a,b) (((a)>(b))?(a):(b))
-#endif
+#include "list.h"
+#include "lock.h"
+#include "log.h"
+#include "process_group.h"
+#include "util.h"
 
 #define MAX_PRIORITY -10
-
-#define VERSION "0.3.2"
 
 /* GLOBAL VARIABLES */
 
 //the "family"
-struct process_group pgroup;
+static struct process_group pgroup;
 //pid of cpulimit
-pid_t cpulimit_pid;
+static pid_t cpulimit_pid;
 //name of this program (maybe cpulimit...)
-char *program_name;
-
-//number of cpu
-int NCPU;
-
-/* CONFIGURATION VARIABLES */
+static const char *program_name;
 
 //verbose mode
-int verbose = 0;
-//lazy mode (exits if there is no process)
-int lazy = 0;
+static int verbose = 0;
+//do not try to raise our own priority
+static int no_boost = 0;
 
-//SIGINT and SIGTERM signal handler
-static void quit(int sig) {
-    //let all the processes continue if stopped
-    struct list_node *node = NULL;
-    if (pgroup.proclist != NULL) {
-        for (node = pgroup.proclist->first; node != NULL; node = node->next) {
-            struct process *p = (struct process *)(node->data);
-            kill(p->pid, SIGCONT);
+//the signal that asked us to stop, or 0. Written only by the handler (async-signal-safe)
+static volatile sig_atomic_t stop_signal = 0;
+//signal mask to wait with: the original one, i.e. with the stop signals deliverable
+static sigset_t wait_mask;
+
+static void on_stop_signal(int sig) {
+    stop_signal = sig;
+}
+
+/* the signals that mean "stop limiting and let the target go" */
+static const int stop_signals[] = { SIGINT, SIGTERM, SIGHUP, SIGQUIT };
+#define NSTOP ((int)(sizeof(stop_signals) / sizeof(stop_signals[0])))
+
+/*
+ * Catch the stop signals, but keep them BLOCKED except while waiting (pselect with
+ * wait_mask), so one can never arrive between a check of stop_signal and the sleep.
+ * A signal that was ignored when we started (nohup, a background job) stays ignored.
+ */
+static void install_signals(void) {
+    sigset_t block;
+    struct sigaction sa, old;
+    int i;
+    sigemptyset(&block);
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = on_stop_signal;
+    sigemptyset(&sa.sa_mask);
+    /* no SA_RESTART: interrupted waits must return so the flag is looked at */
+    for (i = 0; i < NSTOP; i++) {
+        if (sigaction(stop_signals[i], NULL, &old) == 0 && old.sa_handler == SIG_IGN) {
+            continue;
         }
-        close_process_group(&pgroup);
+        if (sigaction(stop_signals[i], &sa, NULL) == 0) {
+            sigaddset(&block, stop_signals[i]);
+        }
     }
-    //fix ^C little problem
-    printf("\r");
-    fflush(stdout);
-    exit(0);
+    /* a closed pipe on stdout must not kill us while a target is stopped */
+    signal(SIGPIPE, SIG_IGN);
+    sigprocmask(SIG_BLOCK, &block, &wait_mask);
+}
+
+//let all the processes we know of continue, in case we stopped them
+static void release_all(struct process_group *pg) {
+    int i;
+    for (i = 0; i < PIDHASH_SZ; i++) {
+        struct list_node *node;
+        if (pg->proctable[i] == NULL) {
+            continue;
+        }
+        for (node = pg->proctable[i]->first; node != NULL; node = node->next) {
+            kill(((struct process *)node->data)->pid, SIGCONT);
+        }
+    }
 }
 
 //return t1-t2 in microseconds (no overflow checks, so better watch out!)
@@ -120,34 +124,16 @@ static inline unsigned long timediff(const struct timeval *t1,const struct timev
     return (t1->tv_sec - t2->tv_sec) * 1000000 + (t1->tv_usec - t2->tv_usec);
 }
 
-static void print_usage(FILE *stream, int exit_code) {
-    fprintf(stream, "Usage: %s [OPTIONS...] TARGET\n", program_name);
-    fprintf(stream, "   OPTIONS\n");
-    fprintf(stream, "      -l, --limit=N                percentage of cpu allowed from 0 to %d (required)\n", 100*NCPU);
-    fprintf(stream, "      -c, --chunk-size=N           enforce CPU limit in N microsecond chunks\n");
-    fprintf(stream, "      -v, --verbose                show control statistics\n");
-    fprintf(stream, "      -V, --version                show program version number\n");
-    fprintf(stream, "      -z, --lazy                   exit if there is no target process, or if it dies\n");
-    fprintf(stream, "      -i, --include-children       limit also the children processes\n");
-    fprintf(stream, "      -m, --minimum-limited-cpu=M  minimum percentage of cpu of target processes\n");
-    fprintf(stream, "      -h, --help                   display this help and exit\n");
-    fprintf(stream, "   TARGET must be exactly one of these:\n");
-    fprintf(stream, "      -p, --pid=N            pid of the process (implies -z)\n");
-    fprintf(stream, "      -e, --exe=FILE         name of the executable program file or path name\n");
-    fprintf(stream, "      COMMAND [ARGS]         run this command and limit it (implies -z)\n");
+static void usage_and_exit(FILE *stream, int ncpu, int exit_code) {
+    cli_usage(stream, program_name, ncpu);
     exit(exit_code);
 }
 
-static void print_version(FILE *stream, int exit_code) {
-    fprintf(stream, "%s\n", VERSION);
-    exit(exit_code);
-}
-
-static void increase_priority() {
+static void increase_priority(void) {
     //find the best available nice value
     int old_priority = getpriority(PRIO_PROCESS, 0);
     int priority = old_priority;
-    while (setpriority(PRIO_PROCESS, 0, priority-1) == 0 && priority>MAX_PRIORITY) {
+    while (priority > MAX_PRIORITY && setpriority(PRIO_PROCESS, 0, priority-1) == 0) {
         priority--;
     }
     if (priority != old_priority) {
@@ -161,43 +147,59 @@ static void increase_priority() {
     }
 }
 
-/* Get the number of CPUs */
-static int get_ncpu() {
-    int ncpu;
+/* Get the number of CPUs; never less than 1 */
+static int get_ncpu(void) {
+    long ncpu = -1;
 #ifdef _SC_NPROCESSORS_ONLN
     ncpu = sysconf(_SC_NPROCESSORS_ONLN);
-#elif defined __APPLE__
-    int mib[2] = {CTL_HW, HW_NCPU};
-    size_t len = sizeof(ncpu);
-    sysctl(mib, 2, &ncpu, &len, NULL, 0);
-#elif defined _GNU_SOURCE
-    ncpu = get_nprocs();
-#else
-    ncpu = -1;
 #endif
-    return ncpu;
+    return ncpu < 1 ? 1 : (ncpu > 65536 ? 65536 : (int)ncpu);
 }
 
-int get_pid_max() {
+/* the kernel's pid limit, or -1 when it cannot be read (then only the lower bound is checked) */
+static long get_pid_max(void) {
 #ifdef __linux__
     //read /proc/sys/kernel/pid_max
-    static char buffer[1024];
+    char buffer[64];
+    long value = -1;
     FILE *fd = fopen("/proc/sys/kernel/pid_max", "r");
-    if (fd==NULL) {
+    if (fd == NULL) {
         return -1;
     }
-    if (fgets(buffer, sizeof(buffer), fd)==NULL) {
-        fclose(fd);
-        return -1;
+    if (fgets(buffer, sizeof(buffer), fd) != NULL) {
+        buffer[strcspn(buffer, "\n")] = '\0';
+        if (parse_long(buffer, 1, 1L << 30, &value) != 0) {
+            value = -1;
+        }
     }
     fclose(fd);
-    return atoi(buffer);
+    return value;
 #else
     return 99998;
 #endif
 }
 
-void limit_process(pid_t pid, double limit, int include_children, float minimum_cpu_usage, int chunk_size) {
+/* start time of a process (the second half of its identity), or -1 if it is gone */
+static int64_t starttime_of(pid_t pid) {
+    struct process_iterator it;
+    struct process proc;
+    struct process_filter filter;
+    int64_t result = -1;
+    memset(&filter, 0, sizeof(filter));
+    filter.pid = pid;
+    if (init_process_iterator(&it, &filter) != 0) {
+        return -1;
+    }
+    if (get_next_process(&it, &proc) == 0) {
+        result = proc.starttime;
+    }
+    close_process_iterator(&it);
+    return result;
+}
+
+enum limit_end { LIMIT_TARGET_GONE, LIMIT_SIGNALLED, LIMIT_FAILED };
+
+static enum limit_end limit_process(pid_t pid, double limit, int include_children, double minimum_cpu_usage, int chunk_size) {
     //slices of the slot: in which the process is allowed to run / is stopped
     struct slices slice;
     //when the last work slice has started
@@ -214,32 +216,40 @@ void limit_process(pid_t pid, double limit, int include_children, float minimum_
     struct list_node *node;
     //counter
     int c = 0;
+    enum limit_end end = LIMIT_TARGET_GONE;
 
     //get a better priority
-    increase_priority();
+    if (!no_boost) {
+        increase_priority();
+    }
 
     //build the family
     if (init_process_group(&pgroup, pid, include_children) != 0) {
-        fprintf(stderr, "Error: out of memory\n");
-        exit(2);
+        report(LOG_ERR, stderr, "Error: out of memory\n");
+        return LIMIT_FAILED;
     }
 
     if (verbose) {
-        printf("Members in the process group owned by %d: %d\n", pgroup.target_pid, pgroup.proclist->count);
+        report(LOG_INFO, stdout, "Members in the process group owned by %d: %d\n", pgroup.target_pid, pgroup.proclist->count);
     }
 
     //rate at which we are keeping active the processes (range 0-1)
     //1 means that the process are using all the twork slice
     double workingrate = -1;
     while (1) {
+        if (stop_signal) {
+            end = LIMIT_SIGNALLED;
+            break;
+        }
         if (update_process_group(&pgroup) != 0) {
-            fprintf(stderr, "Error: out of memory\n");
+            report(LOG_ERR, stderr, "Error: out of memory\n");
+            end = LIMIT_FAILED;
             break;
         }
 
         if (pgroup.proclist->count==0) {
             if (verbose) {
-                printf("No more processes.\n");
+                report(LOG_INFO, stdout, "No more processes.\n");
             }
             break;
         }
@@ -286,8 +296,7 @@ void limit_process(pid_t pid, double limit, int include_children, float minimum_
                 if (verbose) {
                     fprintf(stderr, "SIGCONT failed. Process %d dead!\n", proc->pid);
                 }
-                //remove process from group
-                delete_node(pgroup.proclist, node);
+                //remove process from group (and from the list)
                 remove_process(&pgroup, proc->pid);
             }
             node = next_node;
@@ -295,7 +304,7 @@ void limit_process(pid_t pid, double limit, int include_children, float minimum_
 
         //now processes are free to run (same working slice for all)
         gettimeofday(&startwork, NULL);
-        sleep_ns(slice.work_ns);
+        wait_ns(slice.work_ns, &wait_mask);
         gettimeofday(&endwork, NULL);
         workingtime = timediff(&endwork, &startwork);
 
@@ -303,6 +312,10 @@ void limit_process(pid_t pid, double limit, int include_children, float minimum_
         if (c>0 && delay>10000) {
             //delay is too much! signal to user?
             //fprintf(stderr, "%d %ld us\n", c, delay);
+        }
+        if (stop_signal) {
+            end = LIMIT_SIGNALLED;
+            break;
         }
 
         if (slice.stop_ns>0) {
@@ -316,274 +329,251 @@ void limit_process(pid_t pid, double limit, int include_children, float minimum_
                     if (verbose) {
                         fprintf(stderr, "SIGSTOP failed. Process %d dead!\n", proc->pid);
                     }
-                    //remove process from group
-                    delete_node(pgroup.proclist, node);
+                    //remove process from group (and from the list)
                     remove_process(&pgroup, proc->pid);
                 }
                 node = next_node;
             }
             //now the processes are sleeping
-            sleep_ns(slice.stop_ns);
+            wait_ns(slice.stop_ns, &wait_mask);
         }
         c++;
     }
+    //invariant S1: whatever the reason we leave, nothing is left stopped by us
+    release_all(&pgroup);
     close_process_group(&pgroup);
+    return end;
+}
+
+//wait for a child to end, without ever missing a stop signal; returns 0 and its status, or -1 if signalled
+static int reap_child(pid_t child, int *status) {
+    for (;;) {
+        pid_t r = waitpid(child, status, WNOHANG);
+        if (r == child) {
+            return 0;
+        }
+        if (r < 0 && errno != EINTR) {
+            *status = 0;
+            return 0;  //not our child any more: nothing to wait for
+        }
+        if (stop_signal) {
+            return -1;
+        }
+        wait_ns(100000000LL, &wait_mask);
+    }
+}
+
+//run the command as a child and limit it; never returns
+static void run_command(const struct cli_config *cfg, char **argv, int argc, double limit) {
+    int i;
+    int status = 0;
+    //executable file
+    const char *cmd = argv[cfg->command_start];
+    //command line arguments
+    char **cmd_args = (char **)malloc((argc - cfg->command_start + 1) * sizeof(char *));
+    if (cmd_args==NULL) {
+        exit(2);
+    }
+    for (i=0; i<argc-cfg->command_start; i++) {
+        cmd_args[i] = argv[i+cfg->command_start];
+    }
+    cmd_args[i] = NULL;
+
+    if (verbose) {
+        printf("Running command: '%s", cmd);
+        for (i=1; i<argc-cfg->command_start; i++) {
+            printf(" %s", cmd_args[i]);
+        }
+        printf("'\n");
+    }
+
+    //flush before forking, or the buffered text is written once per process when stdout is a pipe or file
+    fflush(stdout);
+    fflush(stderr);
+    pid_t child = fork();
+    if (child < 0) {
+        exit(EXIT_FAILURE);
+    } else if (child == 0) {
+        //target process code: it must not inherit our signal setup
+        sigprocmask(SIG_SETMASK, &wait_mask, NULL);
+        signal(SIGPIPE, SIG_DFL);
+        int ret = execvp(cmd, cmd_args);
+        //if we are here there was an error, show it
+        perror("Error");
+        exit(ret);
+    }
+    free(cmd_args);
+    //parent code: it is the limiter, and the target is its child, so it learns how the target
+    //ended from waitpid() and there is no second process that could be left behind
+    if (verbose) {
+        report(LOG_INFO, stdout, "Limiting process %d\n",child);
+    }
+    enum limit_end end = limit_process(child, limit, cfg->include_children, cfg->min_cpu, cfg->chunk_us);
+    if (end == LIMIT_SIGNALLED) {
+        //fix ^C little problem
+        printf("\r");
+        fflush(stdout);
+        exit(0);
+    }
+    if (end == LIMIT_FAILED) {
+        kill(child, SIGCONT);
+        exit(2);
+    }
+    if (reap_child(child, &status) != 0) {
+        kill(child, SIGCONT);
+        printf("\r");
+        fflush(stdout);
+        exit(0);
+    }
+    if (WIFEXITED(status)) {
+        if (verbose) {
+            report(LOG_INFO, stdout, "Process %d terminated with exit status %d\n", child, (int)WEXITSTATUS(status));
+        }
+        exit(WEXITSTATUS(status));
+    }
+    printf("Process %d terminated abnormally\n", child);
+    exit(status);
 }
 
 int main(int argc, char **argv) {
-    //argument variables
-    const char *exe = NULL;
-    int perclimit = 0;
-    int exe_ok = 0;
-    int pid_ok = 0;
-    int limit_ok = 0;
+    struct cli_config cfg;
     pid_t pid = 0;
-    float minimum_cpu_usage=0;
-    int include_children = 0;
-    int chunk_size = 100000;
-    long parsed_long = 0;
-    double parsed_double = 0;
+    int lock_fd = -1;
+    int ncpu;
+    long pid_max;
+    enum cli_result parsed;
+
+    //line-buffered output: when stdout is a pipe or a file it would otherwise be flushed every 4 KB,
+    //so a reader (tee, a log file) would see events minutes late and a closed pipe would go unnoticed
+    setvbuf(stdout, NULL, _IOLBF, 0);
 
     //get program name
-#ifdef __sun__
-    char *p = strrchr(argv[0], (unsigned int)'/');
-#else
-    char *p = (char *)memrchr(argv[0], (unsigned int)'/', strlen(argv[0]));
-#endif
-    program_name = p==NULL ? argv[0] : (p+1);
+    program_name = base_name(argv[0]);
     //get current pid
     cpulimit_pid = getpid();
     //get cpu count
-    NCPU = get_ncpu();
+    ncpu = get_ncpu();
+    pid_max = get_pid_max();
 
     //parse arguments
-    int next_option;
-    int option_index = 0;
-    //A string listing valid short options letters
-    const char *short_options = "+p:e:l:c:vVzim:h";
-    //An array describing valid long options
-    const struct option long_options[] = {
-        { "pid",        required_argument,     NULL, 'p' },
-        { "exe",        required_argument,     NULL, 'e' },
-        { "limit",      required_argument,     NULL, 'l' },
-        { "chunk-size", required_argument,     NULL, 'c' },
-        { "verbose",    no_argument,           NULL, 'v' },
-        { "version",    no_argument,           NULL, 'V' },
-        { "lazy",       no_argument,           NULL, 'z' },
-        { "include-children", no_argument,     NULL, 'i' },
-        { "minimum-limited-cpu", required_argument, NULL, 'm' },
-        { "help",       no_argument,           NULL, 'h' },
-        { 0,            0,                     0,     0  }
-    };
+    parsed = cli_parse(argc, argv, ncpu, pid_max, &cfg, stderr);
+    switch (parsed) {
+    case CLI_USAGE:
+        usage_and_exit(stderr, ncpu, 1);
+        break;
+    case CLI_HELP:
+        usage_and_exit(stdout, ncpu, 1);
+        break;
+    case CLI_VERSION:
+        printf("%s\n", cli_version());
+        exit(0);
+    case CLI_OK:
+        break;
+    }
+    verbose = cfg.verbose;
+    no_boost = cfg.no_boost;
+    pid = cfg.pid_set ? (pid_t)cfg.pid : 0;
+    double limit = cfg.limit_pct / 100.0;
 
-    do {
-        next_option = getopt_long(argc, argv, short_options,long_options, &option_index);
-        switch (next_option) {
-        case 'p':
-            //a malformed value becomes -1, which the PID range check below rejects
-            pid = (parse_long(optarg, 0, INT_MAX, &parsed_long) == 0) ? (pid_t)parsed_long : -1;
-            pid_ok = 1;
-            break;
-        case 'e':
-            exe = optarg;
-            exe_ok = 1;
-            break;
-        case 'l':
-            //a malformed value becomes -1, which the limit range check below rejects
-            perclimit = (parse_long(optarg, 0, INT_MAX, &parsed_long) == 0) ? (int)parsed_long : -1;
-            limit_ok = 1;
-            break;
-        case 'c':
-            //a malformed value becomes -1, which the chunk size range check below rejects
-            chunk_size = (parse_long(optarg, 0, INT_MAX, &parsed_long) == 0) ? (int)parsed_long : -1;
-            break;
-        case 'v':
-            verbose = 1;
-            break;
-        case 'V':
-            print_version(stdout, 0);
-            break;
-        case 'z':
-            lazy = 1;
-            break;
-        case 'i':
-            include_children = 1;
-            break;
-        case 'm':
-            if (parse_double(optarg, 0, DBL_MAX, &parsed_double) != 0) {
-                fprintf(stderr,"Error: minimum-limited-cpu must be a non-negative number\n");
-                print_usage(stderr, 1);
-            }
-            minimum_cpu_usage = (float)parsed_double;
-            break;
-        case 'h':
-            print_usage(stdout, 1);
-            break;
-        case '?':
-            print_usage(stderr, 1);
-            break;
-        case -1:
-            break;
-        default:
-            abort();
+    if (cfg.daemonize) {
+        if (daemonize(cfg.pidfile) != 0) {
+            fprintf(stderr, "Error: cannot run in the background: %s\n", strerror(errno));
+            exit(1);
         }
-    } while (next_option != -1);
-
-    if (pid_ok && (pid <= 1 || pid >= get_pid_max())) {
-        fprintf(stderr,"Error: Invalid value for argument PID\n");
-        print_usage(stderr, 1);
-        exit(1);
+        cpulimit_pid = getpid();
+        //nobody reads the console of a daemon: its events go to syslog
+        log_set_console(0);
+        cfg.use_syslog = 1;
     }
-    if (pid != 0) {
-        lazy = 1;
-    }
-
-    if (!limit_ok) {
-        fprintf(stderr,"Error: You must specify a cpu limit percentage\n");
-        print_usage(stderr, 1);
-        exit(1);
-    }
-    double limit = perclimit / 100.0;
-    if (limit<0 || limit >NCPU) {
-        fprintf(stderr,"Error: limit must be in the range 0-%d00\n", NCPU);
-        print_usage(stderr, 1);
-        exit(1);
-    }
-
-    if (1 > chunk_size || chunk_size > 1000000) {
-        fprintf(stderr,"Error: chunk size must be in the range 1-1000000\n");
-        print_usage(stderr, 1);
-        exit(1);
-    }
-
-    if (exe_ok && exe[0] == '\0') {
-        fprintf(stderr,"Error: the executable name must not be empty\n");
-        print_usage(stderr, 1);
-        exit(1);
-    }
-
-    int command_mode = optind < argc;
-    if (exe_ok + pid_ok + command_mode == 0) {
-        fprintf(stderr,"Error: You must specify one target process, either by name, pid, or command line\n");
-        print_usage(stderr, 1);
-        exit(1);
-    }
-
-    if (exe_ok + pid_ok + command_mode > 1) {
-        fprintf(stderr,"Error: You must specify exactly one target process, either by name, pid, or command line\n");
-        print_usage(stderr, 1);
-        exit(1);
+    if (cfg.use_syslog) {
+        log_set_syslog(1, program_name);
     }
 
     //all arguments are ok!
-    signal(SIGINT, quit);
-    signal(SIGTERM, quit);
+    install_signals();
 
     //print the number of available cpu
     if (verbose) {
-        printf("%d cpu detected\n", NCPU);
+        printf("%d cpu detected\n", ncpu);
     }
 
-    if (command_mode) {
-        int i;
-        //executable file
-        const char *cmd = argv[optind];
-        //command line arguments
-        char **cmd_args = (char **)malloc((argc-optind + 1) * sizeof(char *));
-        if (cmd_args==NULL) {
-            exit(2);
-        }
-        for (i=0; i<argc-optind; i++) {
-            cmd_args[i] = argv[i+optind];
-        }
-        cmd_args[i] = NULL;
-
-        if (verbose) {
-            printf("Running command: '%s", cmd);
-            for (i=1; i<argc-optind; i++) {
-                printf(" %s", cmd_args[i]);
-            }
-            printf("'\n");
-        }
-
-        //flush before forking, or the buffered text is written once per process when stdout is a pipe or file
-        fflush(stdout);
-        fflush(stderr);
-        int child = fork();
-        if (child < 0) {
-            exit(EXIT_FAILURE);
-        } else if (child == 0) {
-            //target process code
-            int ret = execvp(cmd, cmd_args);
-            //if we are here there was an error, show it
-            perror("Error");
-            exit(ret);
-        } else {
-            //parent code
-            free(cmd_args);
-            int limiter = fork();
-            if (limiter < 0) {
-                exit(EXIT_FAILURE);
-            } else if (limiter > 0) {
-                //parent
-                int status_process;
-                int status_limiter;
-                waitpid(child, &status_process, 0);
-                waitpid(limiter, &status_limiter, 0);
-                if (WIFEXITED(status_process)) {
-                    if (verbose) {
-                        printf("Process %d terminated with exit status %d\n", child, (int)WEXITSTATUS(status_process));
-                    }
-                    exit(WEXITSTATUS(status_process));
-                }
-                printf("Process %d terminated abnormally\n", child);
-                exit(status_process);
-            } else {
-                //limiter code
-                if (verbose) {
-                    printf("Limiting process %d\n",child);
-                }
-                limit_process(child, limit, include_children, minimum_cpu_usage, chunk_size);
-                exit(0);
-            }
-        }
+    if (cfg.command_start != 0) {
+        run_command(&cfg, argv, argc, limit);
     }
 
     while (1) {
         //look for the target process..or wait for it
         pid_t ret = 0;
-        if (pid_ok) {
+        if (cfg.pid_set) {
             //search by pid
             ret = find_process_by_pid(pid);
             if (ret == 0) {
-                printf("No process found\n");
+                report(LOG_NOTICE, stdout, "No process found\n");
             } else if (ret < 0) {
-                printf("Process found but you aren't allowed to control it\n");
+                report(LOG_NOTICE, stdout, "Process found but you aren't allowed to control it\n");
             }
         } else {
             //search by file or path name
-            ret = find_process_by_name(exe);
+            ret = find_process_by_name(cfg.exe);
             if (ret == 0) {
-                printf("No process found\n");
+                report(LOG_NOTICE, stdout, "No process found\n");
             } else if (ret < 0) {
-                printf("Process found but you aren't allowed to control it\n");
+                report(LOG_NOTICE, stdout, "Process found but you aren't allowed to control it\n");
             } else {
                 pid = ret;
             }
         }
         if (ret > 0) {
             if (ret == cpulimit_pid) {
-                printf("Target process %d is cpulimit itself! Aborting because it makes no sense\n", ret);
+                report(LOG_ERR, stdout, "Target process %d is cpulimit itself! Aborting because it makes no sense\n", ret);
                 exit(1);
             }
-            printf("Process %d found\n", pid);
+            //one limiter per target: two would undo each other's SIGSTOP/SIGCONT
+            if (!cfg.no_lock) {
+                int64_t started = starttime_of(pid);
+                pid_t holder = 0;
+                if (started >= 0) {
+                    switch (target_lock_acquire(pid, started, NULL, &lock_fd, &holder)) {
+                    case LOCK_ACQUIRED:
+                        break;
+                    case LOCK_BUSY:
+                        report(LOG_ERR, stderr, "Error: process %d is already being limited by another cpulimit (pid %d); use --no-lock to override\n", pid, (int)holder);
+                        exit(1);
+                    case LOCK_ERROR:
+                        report(LOG_WARNING, stderr, "Warning: cannot create the lock file (%s); going on without it\n", strerror(errno));
+                        lock_fd = -1;
+                        break;
+                    }
+                }
+            }
+            report(LOG_INFO, stdout, "Process %d found\n", pid);
             //control
-            limit_process(pid, limit, include_children, minimum_cpu_usage, chunk_size);
+            {
+                enum limit_end end = limit_process(pid, limit, cfg.include_children, cfg.min_cpu, cfg.chunk_us);
+                target_lock_release(lock_fd);
+                lock_fd = -1;
+                if (end == LIMIT_SIGNALLED) {
+                    printf("\r");
+                    fflush(stdout);
+                    exit(0);
+                }
+                if (end == LIMIT_FAILED) {
+                    exit(2);
+                }
+            }
         }
-        if (lazy) {
+        if (cfg.lazy) {
             break;
         }
-        sleep(2);
+        if (stop_signal) {
+            break;
+        }
+        wait_ns(2000000000LL, &wait_mask);
+        if (stop_signal) {
+            printf("\r");
+            fflush(stdout);
+            break;
+        }
     };
 
     exit(0);
