@@ -46,7 +46,7 @@ jobs:
         run: |
           make CFLAGS="-O1 -g" $(for t in process_iterator util limiter procfs_parse group list cli_parse lock; do printf 'build/test/%s_test ' $t; done)
           for t in process_iterator util limiter procfs_parse group list cli_parse lock; do
-            valgrind -q --leak-check=full --error-exitcode=99 build/test/${t}_test
+            bash scripts/ci_run.sh "valgrind $t" valgrind -q --leak-check=full --error-exitcode=99 build/test/${t}_test
           done
       - name: stress test (churn, 300 children, valgrind attach and command mode)
         run: make stress
@@ -67,7 +67,7 @@ jobs:
         run: make analyze
       - name: cppcheck
         run: |
-          cppcheck --error-exitcode=1 --inline-suppr --enable=warning,portability,performance \
+          bash scripts/ci_run.sh cppcheck cppcheck --error-exitcode=1 --inline-suppr --enable=warning,portability,performance \
             --std=c99 --suppress=missingIncludeSystem -I src \
             $(ls src/*.c | grep -v 'process_iterator_\(apple\|freebsd\|solaris\)')
       - name: scan-build
@@ -97,9 +97,9 @@ jobs:
       - uses: actions/checkout@v4
       - run: sudo apt-get update && sudo apt-get install -y cbmc
       - name: harnesses as random tests (checks that the harnesses themselves are sound)
-        run: make verif-sim
+        run: bash scripts/ci_run.sh verif-sim make verif-sim
       - name: bounded model checking
-        run: make verif-cbmc
+        run: bash scripts/ci_run.sh cbmc make verif-cbmc
 
   mutation:
     runs-on: ubuntu-24.04

@@ -131,17 +131,21 @@ void test_all_processes() {
     struct process_iterator it;
     struct process process;
     struct process_filter filter;
-    int count = 0;
+    int count = 0, self_seen = 0;
     filter_for(&filter, 0, 0, 0);
     init_process_iterator(&it, &filter);
     while (get_next_process(&it, &process) == 0) {
         if (process.pid == getpid()) {
             CHECK(process.ppid == getppid());
             CHECK(process.cputime < 100);
+            self_seen++;
         }
         count++;
     }
-    CHECK(count >= 10);
+    /* A container may hold only a handful of processes, so do not assume a host-like number:
+     * every process is listed once, and this one is among them. */
+    CHECK(self_seen == 1);
+    CHECK(count >= 1);
     close_process_iterator(&it);
 }
 
@@ -154,7 +158,7 @@ void test_process_group_all() {
     for (node=pgroup.proclist->first; node!= NULL; node=node->next) {
         count++;
     }
-    CHECK(count > 10);
+    CHECK(count >= 1);  /* see test_all_processes: no assumption about how many others exist */
     CHECK(update_process_group(&pgroup) == 0);
     CHECK(close_process_group(&pgroup) == 0);
 }

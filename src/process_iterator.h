@@ -81,6 +81,8 @@ struct process_filter {
 
 #if defined __linux__
 struct proc_rec;
+#elif defined __APPLE__
+struct apple_rec;
 #endif
 
 struct process_iterator {
@@ -99,9 +101,9 @@ struct process_iterator {
     int count;
     int i;
 #elif defined __APPLE__
-    int i;
-    int count;
-    int *pidlist;
+    struct apple_rec *recs;
+    size_t nrecs;
+    size_t pos;
 #endif
     struct process_filter *filter;
 };

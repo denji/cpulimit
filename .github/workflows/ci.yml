@@ -76,7 +76,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-13, macos-14, macos-15]
+        # macos-13 was retired by GitHub: a job asking for it waits for a runner forever
+        os: [macos-14, macos-15]
     steps:
       - uses: actions/checkout@v4
       - run: bash scripts/ci_run.sh "macos build" make WERROR=1 CFLAGS="-O2 -g" all
