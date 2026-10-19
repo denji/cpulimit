@@ -34,14 +34,14 @@ COMPAT_BIN := $(SRCDIR)/$(NAME)
 ALL_CPPFLAGS := -D_GNU_SOURCE -I$(SRCDIR) $(CPPFLAGS)
 ALL_CFLAGS   := -Wall -Wextra $(if $(WERROR),-Werror) $(CFLAGS)
 
-LDLIBS_PLAT :=
+LDLIBS_PLAT := -lm
 ifeq ($(UNAME),FreeBSD)
 LDLIBS_PLAT += -lkvm
 endif
 
-LIB_OBJS   := $(addprefix $(BUILD)/,list.o process_iterator.o process_group.o util.o limiter.o)
+LIB_OBJS   := $(addprefix $(BUILD)/,list.o process_iterator.o process_group.o util.o limiter.o procfs_parse.o)
 MAIN_OBJ   := $(BUILD)/cpulimit.o
-UNIT_TESTS := process_iterator_test util_test limiter_test
+UNIT_TESTS := process_iterator_test util_test limiter_test procfs_parse_test group_test
 TEST_BINS  := $(addprefix $(BUILD)/test/,$(UNIT_TESTS) busy)
 
 HAVE_HELP2MAN := $(shell command -v $(HELP2MAN) 2>/dev/null)
@@ -71,6 +71,17 @@ $(BIN): $(MAIN_OBJ) $(LIB_OBJS)
 
 $(BUILD)/test/%_test: $(TESTDIR)/%_test.c $(LIB_OBJS) $(BUILD)/.flags
 	$(CC) $(ALL_CPPFLAGS) -I$(TESTDIR) -UNDEBUG -MMD -MP $(ALL_CFLAGS) -o $@ $< $(LIB_OBJS) $(LDFLAGS) $(LDLIBS_PLAT)
+
+# The group tests run process_group.c against a scripted iterator and an allocator that can
+# fail on demand, so list.c and process_group.c are rebuilt here with the allocation seam on.
+GT_DEFS := -DCL_ALLOC_HEADER='"fault_alloc.h"' -I$(TESTDIR)
+
+$(BUILD)/test/gt_%.o: $(SRCDIR)/%.c $(BUILD)/.flags
+	$(CC) $(ALL_CPPFLAGS) $(GT_DEFS) -MMD -MP $(ALL_CFLAGS) -c -o $@ $<
+
+$(BUILD)/test/group_test: $(TESTDIR)/group_test.c $(TESTDIR)/fake_iterator.c $(TESTDIR)/fault_alloc.c \
+        $(BUILD)/test/gt_list.o $(BUILD)/test/gt_process_group.o $(BUILD)/util.o $(BUILD)/.flags
+	$(CC) $(ALL_CPPFLAGS) -I$(TESTDIR) -UNDEBUG $(ALL_CFLAGS) -o $@ $(filter %.c %.o,$^) $(LDFLAGS)
 
 $(BUILD)/test/busy: $(TESTDIR)/busy.c $(BUILD)/.flags
 	$(CC) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -o $@ $< $(LDFLAGS) -lpthread

@@ -26,6 +26,8 @@ dir=$(dirname "$0")
 run process_iterator_test "$BUILD/test/process_iterator_test"
 run util_test "$BUILD/test/util_test"
 run limiter_test "$BUILD/test/limiter_test"
+run procfs_parse_test "$BUILD/test/procfs_parse_test"
+run group_test "$BUILD/test/group_test"
 run cli_test env BUILD="$BUILD" sh "$dir/cli_test.sh"
 
 printf '\n%d test(s), %d failed\n' "$total" "$failed"

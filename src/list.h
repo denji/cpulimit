@@ -55,7 +55,8 @@ void init_list(struct list *l,int keysize);
 
 /*
  * Add a new element at the end of the list
- * return the pointer to the new node
+ * return the pointer to the new node, or NULL if memory is exhausted
+ * (the list is then unchanged)
  */
 struct list_node *add_elem(struct list *l,void *elem);
 

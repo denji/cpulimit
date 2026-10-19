@@ -22,6 +22,7 @@
 #include <errno.h>
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "util.h"
 
@@ -77,6 +78,11 @@ int parse_double(const char *s, double min, double max, double *out) {
     }
     *out = v;
     return 0;
+}
+
+const char *base_name(const char *path) {
+    const char *slash = strrchr(path, '/');
+    return slash == NULL ? path : slash + 1;
 }
 
 int64_t now_ns(void) {

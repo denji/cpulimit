@@ -26,12 +26,13 @@ void compute_slices(double limit, double pcpu, double prev_rate, long chunk_us, 
     if (pcpu < 0) {
         //it's the 1st cycle: start from the requested limit
         rate = limit;
-    } else if (pcpu == 0) {
-        //measured as completely idle: release it (the ratio below would divide by zero)
-        rate = 1;
     } else {
-        //scale the previous rate by how far the measured usage is from the limit
-        rate = prev_rate / pcpu * limit;
+        //scale the previous rate by how far the measured usage is from the limit:
+        //rate = prev_rate * limit / pcpu, which is clamped to 1 below. When the quotient would
+        //reach 1 (this includes an idle process, pcpu == 0, and the denormal usage an idle
+        //process decays to) the division is skipped, so it can never divide by zero or overflow.
+        double target = prev_rate * limit;
+        rate = (target >= pcpu) ? 1 : target / pcpu;
     }
     if (rate != rate) {
         rate = 1;  //NaN

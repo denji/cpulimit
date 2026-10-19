@@ -219,7 +219,10 @@ void limit_process(pid_t pid, double limit, int include_children, float minimum_
     increase_priority();
 
     //build the family
-    init_process_group(&pgroup, pid, include_children);
+    if (init_process_group(&pgroup, pid, include_children) != 0) {
+        fprintf(stderr, "Error: out of memory\n");
+        exit(2);
+    }
 
     if (verbose) {
         printf("Members in the process group owned by %d: %d\n", pgroup.target_pid, pgroup.proclist->count);
@@ -229,7 +232,10 @@ void limit_process(pid_t pid, double limit, int include_children, float minimum_
     //1 means that the process are using all the twork slice
     double workingrate = -1;
     while (1) {
-        update_process_group(&pgroup);
+        if (update_process_group(&pgroup) != 0) {
+            fprintf(stderr, "Error: out of memory\n");
+            break;
+        }
 
         if (pgroup.proclist->count==0) {
             if (verbose) {
@@ -446,6 +452,12 @@ int main(int argc, char **argv) {
 
     if (1 > chunk_size || chunk_size > 1000000) {
         fprintf(stderr,"Error: chunk size must be in the range 1-1000000\n");
+        print_usage(stderr, 1);
+        exit(1);
+    }
+
+    if (exe_ok && exe[0] == '\0') {
+        fprintf(stderr,"Error: the executable name must not be empty\n");
         print_usage(stderr, 1);
         exit(1);
     }

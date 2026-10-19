@@ -35,6 +35,12 @@
 int parse_long(const char *s, long min, long max, long *out);
 int parse_double(const char *s, double min, double max, double *out);
 
+/*
+ * The part of path after its last '/' (the whole string if there is none).
+ * Never modifies its argument, unlike POSIX basename().
+ */
+const char *base_name(const char *path);
+
 /* Monotonic clock in nanoseconds (immune to wall-clock steps). */
 int64_t now_ns(void);
 

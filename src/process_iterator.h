@@ -23,6 +23,8 @@
 
 #define __PROCESS_ITERATOR_H
 
+#include <stddef.h>
+#include <stdint.h>
 #include <unistd.h>
 #include <limits.h>
 #include <dirent.h>
@@ -55,24 +57,40 @@ struct process {
     pid_t pid;
     //ppid of the process
     pid_t ppid;
-    //start time (unix timestamp)
-    int starttime;
+    //process identity: start time, only ever compared for equality (together with
+    //the pid) to tell a process from a later one that reuses its pid. The unit is
+    //platform dependent (clock ticks since boot on Linux, seconds elsewhere).
+    int64_t starttime;
     //cputime used by the process (in milliseconds)
-    int cputime;
-    //actual cpu usage estimation (value in range 0-1)
+    int64_t cputime;
+    //actual cpu usage estimation (value in range 0-1), -1 until measured
     double cpu_usage;
-    //absolute path of the executable file
+    //owned by process_group (mark of the last update that saw this process)
+    uint32_t group_seq;
+    //path of the executable file (argv[0]); only filled when filter.need_command is set on Linux
     char command[PATH_MAX+1];
 };
 
 struct process_filter {
+    //pid of the target process, 0 for every process
     int pid;
     int include_children;
-    char program_name[PATH_MAX+1];
+    //fill process.command; reading it costs extra system calls per process, so leave it 0 when unused
+    int need_command;
 };
 
+#if defined __linux__
+struct proc_rec;
+#endif
+
 struct process_iterator {
-#if defined __linux__ || defined __sun__
+#if defined __linux__
+    DIR *dip;
+    int mode;
+    struct proc_rec *recs;
+    size_t nrecs;
+    size_t pos;
+#elif defined __sun__
     DIR *dip;
     int boot_time;
 #elif defined __FreeBSD__

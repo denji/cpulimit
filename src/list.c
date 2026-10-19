@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc.h"
 #include "list.h"
 
 #define EMPTYLIST NULL
@@ -33,7 +34,10 @@ void init_list(struct list *l,int keysize) {
 }
 
 struct list_node *add_elem(struct list *l,void *elem) {
-    struct list_node *newnode=(struct list_node *)malloc(sizeof(struct list_node));
+    struct list_node *newnode=(struct list_node *)CL_MALLOC(sizeof(struct list_node));
+    if (newnode==NULL) {
+        return NULL;
+    }
     newnode->data=elem;
     newnode->previous=l->last;
     newnode->next=NULL;
@@ -61,11 +65,11 @@ void delete_node(struct list *l,struct list_node *node) {
         node->next->previous=node->previous;
     }
     l->count--;
-    free(node);
+    CL_FREE(node);
 }
 
 void destroy_node(struct list *l,struct list_node *node) {
-    free(node->data);
+    CL_FREE(node->data);
     node->data=NULL;
     delete_node(l,node);
 }
@@ -79,7 +83,7 @@ int get_list_count(struct list *l) {
 }
 
 void *first_elem(struct list *l) {
-    return l->first->data;
+    return l->first==NULL?NULL:l->first->data;
 }
 
 struct list_node *first_node(struct list *l) {
@@ -87,7 +91,7 @@ struct list_node *first_node(struct list *l) {
 }
 
 void *last_elem(struct list *l) {
-    return l->last->data;
+    return l->last==NULL?NULL:l->last->data;
 }
 
 struct list_node *last_node(struct list *l) {
@@ -124,7 +128,7 @@ void clear_list(struct list *l) {
         struct list_node *tmp;
         tmp=l->first;
         l->first=l->first->next;
-        free(tmp);
+        CL_FREE(tmp);
         tmp=NULL;
     }
     l->last=EMPTYLIST;
@@ -136,9 +140,9 @@ void destroy_list(struct list *l) {
         struct list_node *tmp;
         tmp=l->first;
         l->first=l->first->next;
-        free(tmp->data);
+        CL_FREE(tmp->data);
         tmp->data=NULL;
-        free(tmp);
+        CL_FREE(tmp);
         tmp=NULL;
     }
     l->last=EMPTYLIST;
