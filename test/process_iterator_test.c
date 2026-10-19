@@ -208,6 +208,8 @@ void test_process_group_wrong_pid() {
     assert(pgroup.proclist->count == 0);
     update_process_group(&pgroup);
     assert(pgroup.proclist->count == 0);
+    //re-initializing a live group would leak its list, so close it first
+    assert(close_process_group(&pgroup) == 0);
     assert(init_process_group(&pgroup, 9999999, 0) == 0);
     assert(pgroup.proclist->count == 0);
     update_process_group(&pgroup);

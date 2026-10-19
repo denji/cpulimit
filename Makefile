@@ -39,9 +39,10 @@ ifeq ($(UNAME),FreeBSD)
 LDLIBS_PLAT += -lkvm
 endif
 
-LIB_OBJS  := $(addprefix $(BUILD)/,list.o process_iterator.o process_group.o)
-MAIN_OBJ  := $(BUILD)/cpulimit.o
-TEST_BINS := $(BUILD)/test/process_iterator_test $(BUILD)/test/busy
+LIB_OBJS   := $(addprefix $(BUILD)/,list.o process_iterator.o process_group.o util.o limiter.o)
+MAIN_OBJ   := $(BUILD)/cpulimit.o
+UNIT_TESTS := process_iterator_test util_test limiter_test
+TEST_BINS  := $(addprefix $(BUILD)/test/,$(UNIT_TESTS) busy)
 
 HAVE_HELP2MAN := $(shell command -v $(HELP2MAN) 2>/dev/null)
 ifneq ($(HAVE_HELP2MAN),)
@@ -68,8 +69,8 @@ $(BUILD)/%.o: $(SRCDIR)/%.c $(BUILD)/.flags
 $(BIN): $(MAIN_OBJ) $(LIB_OBJS)
 	$(CC) -o $@ $(MAIN_OBJ) $(LIB_OBJS) $(LDFLAGS) $(LDLIBS_PLAT)
 
-$(BUILD)/test/process_iterator_test: $(TESTDIR)/process_iterator_test.c $(LIB_OBJS) $(BUILD)/.flags
-	$(CC) $(ALL_CPPFLAGS) -UNDEBUG -MMD -MP $(ALL_CFLAGS) -o $@ $< $(LIB_OBJS) $(LDFLAGS) $(LDLIBS_PLAT)
+$(BUILD)/test/%_test: $(TESTDIR)/%_test.c $(LIB_OBJS) $(BUILD)/.flags
+	$(CC) $(ALL_CPPFLAGS) -I$(TESTDIR) -UNDEBUG -MMD -MP $(ALL_CFLAGS) -o $@ $< $(LIB_OBJS) $(LDFLAGS) $(LDLIBS_PLAT)
 
 $(BUILD)/test/busy: $(TESTDIR)/busy.c $(BUILD)/.flags
 	$(CC) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -o $@ $< $(LDFLAGS) -lpthread

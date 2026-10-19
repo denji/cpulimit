@@ -51,8 +51,13 @@
     #include <libgen.h>
 #endif
 
+#include <float.h>
+#include <limits.h>
+
 #include "process_group.h"
 #include "list.h"
+#include "util.h"
+#include "limiter.h"
 
 #ifdef HAVE_SYS_SYSINFO_H
     #include <sys/sysinfo.h>
@@ -193,17 +198,14 @@ int get_pid_max() {
 }
 
 void limit_process(pid_t pid, double limit, int include_children, float minimum_cpu_usage, int chunk_size) {
-    //slice of the slot in which the process is allowed to run
-    struct timespec twork;
-    //slice of the slot in which the process is stopped
-    struct timespec tsleep;
-    //when the last twork has started
+    //slices of the slot: in which the process is allowed to run / is stopped
+    struct slices slice;
+    //when the last work slice has started
     struct timeval startwork;
-    //when the last twork has finished
+    //when the last work slice has finished
     struct timeval endwork;
     //initialization
-    memset(&twork, 0, sizeof(struct timespec));
-    memset(&tsleep, 0, sizeof(struct timespec));
+    memset(&slice, 0, sizeof(struct slices));
     memset(&startwork, 0, sizeof(struct timeval));
     memset(&endwork, 0, sizeof(struct timeval));
     //last working time in microseconds
@@ -252,25 +254,19 @@ void limit_process(pid_t pid, double limit, int include_children, float minimum_
             pcpu += proc->cpu_usage;
         }
 
-        //adjust work and sleep time slices
+        //adjust work and sleep time slices (pcpu < 0: it's the 1st cycle)
+        compute_slices(limit, pcpu, workingrate, chunk_size, &slice);
+        workingrate = slice.rate;
         if (pcpu < 0) {
-            //it's the 1st cycle, initialize workingrate
             pcpu = limit;
-            workingrate = limit;
-            twork.tv_nsec = chunk_size * limit * 1000;
-        } else {
-            //adjust workingrate
-            workingrate = MIN(workingrate / pcpu * limit, 1);
-            twork.tv_nsec = chunk_size * 1000 * workingrate;
         }
-        tsleep.tv_nsec = chunk_size * 1000 - twork.tv_nsec;
 
         if (verbose) {
             if (c%200==0) {
                 printf("\n%%CPU\twork quantum\tsleep quantum\tactive rate\n");
             }
             if (c%10==0 && c>0) {
-                printf("%0.2lf%%\t%6ld us\t%6ld us\t%0.2lf%%\n", pcpu*100, twork.tv_nsec/1000, tsleep.tv_nsec/1000, workingrate*100);
+                printf("%0.2lf%%\t%6ld us\t%6ld us\t%0.2lf%%\n", pcpu*100, (long)(slice.work_ns/1000), (long)(slice.stop_ns/1000), workingrate*100);
             }
         }
 
@@ -293,18 +289,18 @@ void limit_process(pid_t pid, double limit, int include_children, float minimum_
 
         //now processes are free to run (same working slice for all)
         gettimeofday(&startwork, NULL);
-        nanosleep(&twork, NULL);
+        sleep_ns(slice.work_ns);
         gettimeofday(&endwork, NULL);
         workingtime = timediff(&endwork, &startwork);
 
-        long delay = workingtime - twork.tv_nsec/1000;
+        long delay = workingtime - slice.work_ns/1000;
         if (c>0 && delay>10000) {
             //delay is too much! signal to user?
             //fprintf(stderr, "%d %ld us\n", c, delay);
         }
 
-        if (tsleep.tv_nsec>0) {
-            //stop processes only if tsleep>0
+        if (slice.stop_ns>0) {
+            //stop processes only if the stop slice is not empty
             node = pgroup.proclist->first;
             while (node != NULL) {
                 struct list_node *next_node = node->next;
@@ -321,7 +317,7 @@ void limit_process(pid_t pid, double limit, int include_children, float minimum_
                 node = next_node;
             }
             //now the processes are sleeping
-            nanosleep(&tsleep,NULL);
+            sleep_ns(slice.stop_ns);
         }
         c++;
     }
@@ -339,6 +335,8 @@ int main(int argc, char **argv) {
     float minimum_cpu_usage=0;
     int include_children = 0;
     int chunk_size = 100000;
+    long parsed_long = 0;
+    double parsed_double = 0;
 
     //get program name
 #ifdef __sun__
@@ -367,7 +365,7 @@ int main(int argc, char **argv) {
         { "version",    no_argument,           NULL, 'V' },
         { "lazy",       no_argument,           NULL, 'z' },
         { "include-children", no_argument,     NULL, 'i' },
-        { "minimum-limited-cpu", no_argument,  NULL, 'm' },
+        { "minimum-limited-cpu", required_argument, NULL, 'm' },
         { "help",       no_argument,           NULL, 'h' },
         { 0,            0,                     0,     0  }
     };
@@ -376,7 +374,8 @@ int main(int argc, char **argv) {
         next_option = getopt_long(argc, argv, short_options,long_options, &option_index);
         switch (next_option) {
         case 'p':
-            pid = atoi(optarg);
+            //a malformed value becomes -1, which the PID range check below rejects
+            pid = (parse_long(optarg, 0, INT_MAX, &parsed_long) == 0) ? (pid_t)parsed_long : -1;
             pid_ok = 1;
             break;
         case 'e':
@@ -384,11 +383,13 @@ int main(int argc, char **argv) {
             exe_ok = 1;
             break;
         case 'l':
-            perclimit = atoi(optarg);
+            //a malformed value becomes -1, which the limit range check below rejects
+            perclimit = (parse_long(optarg, 0, INT_MAX, &parsed_long) == 0) ? (int)parsed_long : -1;
             limit_ok = 1;
             break;
         case 'c':
-            chunk_size = atoi(optarg);
+            //a malformed value becomes -1, which the chunk size range check below rejects
+            chunk_size = (parse_long(optarg, 0, INT_MAX, &parsed_long) == 0) ? (int)parsed_long : -1;
             break;
         case 'v':
             verbose = 1;
@@ -403,7 +404,11 @@ int main(int argc, char **argv) {
             include_children = 1;
             break;
         case 'm':
-            minimum_cpu_usage = atof(optarg);
+            if (parse_double(optarg, 0, DBL_MAX, &parsed_double) != 0) {
+                fprintf(stderr,"Error: minimum-limited-cpu must be a non-negative number\n");
+                print_usage(stderr, 1);
+            }
+            minimum_cpu_usage = (float)parsed_double;
             break;
         case 'h':
             print_usage(stdout, 1);
@@ -439,8 +444,8 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    if (0 > chunk_size || chunk_size > 1000000) {
-        fprintf(stderr,"Error: chunk size must be in the range 0-1000000\n");
+    if (1 > chunk_size || chunk_size > 1000000) {
+        fprintf(stderr,"Error: chunk size must be in the range 1-1000000\n");
         print_usage(stderr, 1);
         exit(1);
     }
@@ -489,6 +494,9 @@ int main(int argc, char **argv) {
             printf("'\n");
         }
 
+        //flush before forking, or the buffered text is written once per process when stdout is a pipe or file
+        fflush(stdout);
+        fflush(stderr);
         int child = fork();
         if (child < 0) {
             exit(EXIT_FAILURE);
