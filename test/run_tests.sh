@@ -1,0 +1,27 @@
+#!/bin/sh
+# Test driver. Usage: BUILD=build sh test/run_tests.sh
+# Each test is a program that exits 0 on success. A failing test does not stop
+# the run; the script exits non-zero if any test failed.
+
+BUILD=${BUILD:-build}
+failed=0
+total=0
+
+run() {
+    name=$1
+    shift
+    total=$((total + 1))
+    printf 'RUN   %s\n' "$name"
+    if "$@"; then
+        printf 'PASS  %s\n' "$name"
+    else
+        rc=$?
+        printf 'FAIL  %s (exit status %d)\n' "$name" "$rc"
+        failed=$((failed + 1))
+    fi
+}
+
+run process_iterator_test "$BUILD/test/process_iterator_test"
+
+printf '\n%d test(s), %d failed\n' "$total" "$failed"
+[ "$failed" -eq 0 ]
