@@ -126,9 +126,21 @@ int64_t ticks_to_ms(uint64_t ticks, long clk_tck) {
     if (seconds > (uint64_t)INT64_MAX / 1000u) {
         return INT64_MAX;
     }
-    /* rest < hz <= LONG_MAX, and rest * 1000 may exceed 64 bits only for absurd hz */
-    if (rest > UINT64_MAX / 1000u) {
-        return INT64_MAX;
+    if (rest <= UINT64_MAX / 1000u) {
+        return (int64_t)(seconds * 1000u + rest * 1000u / hz);
     }
-    return (int64_t)(seconds * 1000u + rest * 1000u / hz);
+    {
+        /* Only for an absurd clock rate (hz > 1.8e16): rest * 1000 does not fit in 64 bits, so
+         * divide by repeated addition. rest < hz <= LONG_MAX, hence r + rest < 2^64 always. */
+        uint64_t r = 0, q = 0;
+        int i;
+        for (i = 0; i < 1000; i++) {
+            r += rest;
+            if (r >= hz) {
+                r -= hz;
+                q++;
+            }
+        }
+        return (int64_t)(seconds * 1000u + q);
+    }
 }

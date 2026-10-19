@@ -35,6 +35,15 @@
 #define O_CLOEXEC 0
 #endif
 
+/* The intermediate daemon processes leave with _exit(), which skips the gcov flush. Coverage
+ * builds (-DCL_COVERAGE) dump the counters first; normal builds are unaffected. */
+#ifdef CL_COVERAGE
+void __gcov_dump(void);
+#define child_exit(code) do { __gcov_dump(); _exit(code); } while (0)
+#else
+#define child_exit(code) _exit(code)
+#endif
+
 /* the pid file this daemon created, removed when it exits normally */
 static char owned_pidfile[4096];
 
@@ -171,24 +180,24 @@ int daemonize(const char *pidfile) {
         status = wait_for_status(pipefd[0]);
         close(pipefd[0]);
         (void)waitpid(pid, NULL, 0);
-        _exit(status == 0 ? 0 : 1);
+        child_exit(status == 0 ? 0 : 1);
     }
     /* first child */
     close(pipefd[0]);
     if (setsid() < 0) {
         unsigned char fail = 1;
         send_status(pipefd[1], fail);
-        _exit(1);
+        child_exit(1);
     }
     pid = fork();
     if (pid < 0) {
         unsigned char fail = 1;
         send_status(pipefd[1], fail);
-        _exit(1);
+        child_exit(1);
     }
     if (pid > 0) {
         close(pipefd[1]);
-        _exit(0);  /* the session leader leaves: the daemon can never get a controlling terminal */
+        child_exit(0);  /* the session leader leaves: the daemon can never get a controlling terminal */
     }
     /* the daemon */
     {
@@ -197,16 +206,16 @@ int daemonize(const char *pidfile) {
         umask(0);
         if (chdir("/") != 0) {
             send_status(pipefd[1], fail);
-            _exit(1);
+            child_exit(1);
         }
         if (pidfile != NULL && write_pidfile(pidfile) != 0) {
             send_status(pipefd[1], fail);
-            _exit(1);
+            child_exit(1);
         }
         devnull = open("/dev/null", O_RDWR);
         if (devnull < 0) {
             send_status(pipefd[1], fail);
-            _exit(1);
+            child_exit(1);
         }
         (void)dup2(devnull, STDIN_FILENO);
         (void)dup2(devnull, STDOUT_FILENO);

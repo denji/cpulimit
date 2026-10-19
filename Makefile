@@ -1,7 +1,7 @@
 # cpulimit - GNU make required (use gmake on the BSDs and illumos/Solaris).
 #
 # Targets:    all  check  man  install  uninstall  static  static-install
-#             strip  clean  distclean
+#             strip  clean  distclean  fuzz-standalone  fuzz-libfuzzer  coverage
 # Variables:  PREFIX DESTDIR BINDIR MANDIR CC CFLAGS CPPFLAGS LDFLAGS
 #             BUILD (object/output directory)  WERROR=1  STATIC_CC
 
@@ -29,6 +29,7 @@ SRCDIR     := src
 TESTDIR    := test
 BIN        := $(BUILD)/$(NAME)
 COMPAT_BIN := $(SRCDIR)/$(NAME)
+FUZZ_DIR   := fuzz
 
 # Mandatory flags live here so a user-supplied CFLAGS cannot drop them.
 ALL_CPPFLAGS := -D_GNU_SOURCE -I$(SRCDIR) $(CPPFLAGS)
@@ -43,7 +44,7 @@ LIB_OBJS   := $(addprefix $(BUILD)/,list.o process_iterator.o process_group.o ut
 # modules used by the executable only (they pull in syslog, fork, fcntl and the CLI)
 APP_OBJS   := $(addprefix $(BUILD)/,cli.o lock.o daemon.o log.o)
 MAIN_OBJ   := $(BUILD)/cpulimit.o
-UNIT_TESTS := process_iterator_test util_test limiter_test procfs_parse_test group_test cli_parse_test lock_test
+UNIT_TESTS := process_iterator_test util_test limiter_test procfs_parse_test group_test list_test cli_parse_test lock_test
 TEST_BINS  := $(addprefix $(BUILD)/test/,$(UNIT_TESTS) busy spawn)
 
 HAVE_HELP2MAN := $(shell command -v $(HELP2MAN) 2>/dev/null)
@@ -53,7 +54,7 @@ else
 MAN_FILE :=
 endif
 
-.PHONY: all check test man install uninstall static static-install static_install \
+.PHONY: fuzz-standalone fuzz-libfuzzer coverage all check test man install uninstall static static-install static_install \
         strip clean distclean FORCE
 
 all: $(BIN) $(MAN_FILE)
@@ -83,6 +84,9 @@ $(BUILD)/test/gt_%.o: $(SRCDIR)/%.c $(BUILD)/.flags
 
 $(BUILD)/test/group_test: $(TESTDIR)/group_test.c $(TESTDIR)/fake_iterator.c $(TESTDIR)/fault_alloc.c \
         $(BUILD)/test/gt_list.o $(BUILD)/test/gt_process_group.o $(BUILD)/util.o $(BUILD)/.flags
+	$(CC) $(ALL_CPPFLAGS) -I$(TESTDIR) -UNDEBUG $(ALL_CFLAGS) -o $@ $(filter %.c %.o,$^) $(LDFLAGS)
+
+$(BUILD)/test/list_test: $(TESTDIR)/list_test.c $(TESTDIR)/fault_alloc.c $(BUILD)/test/gt_list.o $(BUILD)/.flags
 	$(CC) $(ALL_CPPFLAGS) -I$(TESTDIR) -UNDEBUG $(ALL_CFLAGS) -o $@ $(filter %.c %.o,$^) $(LDFLAGS)
 
 $(BUILD)/test/busy: $(TESTDIR)/busy.c $(BUILD)/.flags
@@ -138,5 +142,38 @@ distclean:
 	rm -rf build $(COMPAT_BIN) $(COMPAT_BIN).1
 
 FORCE:
+
+# ---- fuzzing -------------------------------------------------------------------------------
+# fuzz-standalone: deterministic mutation driver, only needs a C compiler with ASan/UBSan.
+#   make fuzz-standalone FUZZ_ITERATIONS=1000000 FUZZ_SEED=7
+# fuzz-libfuzzer: coverage-guided (needs clang with the libFuzzer runtime); builds the
+#   targets, run them with e.g.  build/fuzz/fuzz_cli fuzz/corpus/cli -max_total_time=60
+FUZZ_ITERATIONS ?= 200000
+FUZZ_SEED       ?= 1
+FUZZ_SAN        ?= -fsanitize=address,undefined -fno-sanitize-recover=undefined
+FUZZ_SRC_procfs := $(SRCDIR)/procfs_parse.c
+FUZZ_SRC_cli    := $(SRCDIR)/cli.c $(SRCDIR)/util.c
+
+fuzz-standalone:
+	@mkdir -p $(BUILD)/fuzz
+	$(CC) $(ALL_CPPFLAGS) -O1 -g $(FUZZ_SAN) -o $(BUILD)/fuzz/standalone_procfs \
+	    $(FUZZ_DIR)/fuzz_procfs_parse.c $(FUZZ_DIR)/standalone_driver.c $(FUZZ_SRC_procfs)
+	$(CC) $(ALL_CPPFLAGS) -O1 -g $(FUZZ_SAN) -o $(BUILD)/fuzz/standalone_cli \
+	    $(FUZZ_DIR)/fuzz_cli.c $(FUZZ_DIR)/standalone_driver.c $(FUZZ_SRC_cli) -lm
+	cd $(BUILD)/fuzz && ./standalone_procfs -n $(FUZZ_ITERATIONS) -s $(FUZZ_SEED) $(CURDIR)/$(FUZZ_DIR)/corpus/procfs
+	cd $(BUILD)/fuzz && ./standalone_cli -n $(FUZZ_ITERATIONS) -s $(FUZZ_SEED) $(CURDIR)/$(FUZZ_DIR)/corpus/cli
+
+fuzz-libfuzzer:
+	@mkdir -p $(BUILD)/fuzz
+	clang $(ALL_CPPFLAGS) -O1 -g -fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined \
+	    -o $(BUILD)/fuzz/fuzz_procfs_parse $(FUZZ_DIR)/fuzz_procfs_parse.c $(FUZZ_SRC_procfs)
+	clang $(ALL_CPPFLAGS) -O1 -g -fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined \
+	    -o $(BUILD)/fuzz/fuzz_cli $(FUZZ_DIR)/fuzz_cli.c $(FUZZ_SRC_cli) -lm
+
+# ---- coverage ------------------------------------------------------------------------------
+# Builds with gcov instrumentation in its own directory, runs the whole test suite and prints
+# per-file line and branch coverage (scripts/coverage.sh).
+coverage:
+	CC=$(CC) BUILD=$(BUILD)/cov sh scripts/coverage.sh
 
 -include $(wildcard $(BUILD)/*.d $(BUILD)/test/*.d)

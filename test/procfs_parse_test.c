@@ -1,3 +1,4 @@
+#include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -135,6 +136,11 @@ static void test_ticks_to_ms(void) {
     CHECK(ticks_to_ms(12345, -5) == 0);
     CHECK(ticks_to_ms(UINT64_MAX, 100) == INT64_MAX);  /* saturates instead of wrapping */
     CHECK(ticks_to_ms((uint64_t)INT64_MAX, 1) == INT64_MAX);
+    /* hz so large that rest * 1000 overflows 64 bits: the answer is still exact */
+    CHECK(ticks_to_ms((uint64_t)LONG_MAX / 2, LONG_MAX) == 499);   /* 0.4999.. s */
+    CHECK(ticks_to_ms((uint64_t)LONG_MAX - 1, LONG_MAX) == 999);
+    CHECK(ticks_to_ms((uint64_t)LONG_MAX, LONG_MAX) == 1000);
+    CHECK(ticks_to_ms((uint64_t)LONG_MAX + (uint64_t)LONG_MAX / 4, LONG_MAX) == 1249);
     /* exact against the naive formula wherever the naive formula cannot overflow */
     {
         uint64_t t;
