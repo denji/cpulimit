@@ -1,0 +1,125 @@
+name: ci
+
+on:
+  push:
+    branches: [master, main, modernize]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Hosted runners are shared and noisy: the accuracy checks that compare measured CPU shares
+  # against a limit run in the dedicated `timing` job, not in the matrix.
+  CPULIMIT_SKIP_TIMING: "1"
+
+jobs:
+  # Linux: operating system x compiler, optimisation level, warnings are errors.
+  linux:
+    name: ${{ matrix.os }} / ${{ matrix.cc }} / ${{ matrix.opt }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04, ubuntu-24.04-arm]
+        cc: [gcc, clang]
+        opt: ["-O0", "-O2", "-O3"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test
+        run: |
+          make CC=${{ matrix.cc }} WERROR=1 CFLAGS="${{ matrix.opt }} -g" check
+
+  # C standard / feature-test-macro coverage: the code must not rely on gnu extensions silently.
+  standards:
+    name: gcc -std=${{ matrix.std }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        std: [gnu99, gnu11, gnu17, gnu2x]
+    steps:
+      - uses: actions/checkout@v4
+      - run: make CC=gcc WERROR=1 CFLAGS="-O2 -std=${{ matrix.std }} -pedantic-errors -Wno-error=pedantic" check
+
+  # musl libc (Alpine) on the architectures Alpine publishes, via qemu user emulation.
+  alpine:
+    name: alpine musl / ${{ matrix.platform }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [linux/amd64, linux/arm64, linux/arm/v7, linux/386, linux/ppc64le, linux/s390x, linux/riscv64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - name: Build and test inside Alpine
+        run: |
+          docker run --rm --platform ${{ matrix.platform }} -v "$PWD:/src" -w /src alpine:3.20 sh -ec '
+            apk add --no-cache build-base make procps coreutils bash
+            make WERROR=1 CFLAGS="-O2 -g" check'
+
+  # macOS has its own process iterator (libproc). Only the portable unit tests exist there:
+  # the integration test relies on /proc and is Linux-only.
+  # The macOS, FreeBSD iterators were adapted to the new interface WITHOUT being compiled by their
+  # author (no such host was available), so these two jobs report but do not gate until they
+  # have gone green once. Remove `continue-on-error` then.
+  macos:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-13, macos-14, macos-15]
+    steps:
+      - uses: actions/checkout@v4
+      - run: make WERROR=1 CFLAGS="-O2 -g" all
+      - name: Unit tests
+        run: make CFLAGS="-O2 -g" check SKIP_INTEGRATION=1
+
+  freebsd:
+    name: freebsd ${{ matrix.version }}
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ["14.1"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cross-platform-actions/action@v0.25.0
+        with:
+          operating_system: freebsd
+          version: ${{ matrix.version }}
+          run: |
+            sudo pkg install -y gmake
+            gmake WERROR=1 CFLAGS="-O2 -g" all
+
+  # Real timing: one job, one compiler, nothing else running, so the numbers mean something.
+  timing:
+    name: accuracy (timing checks)
+    runs-on: ubuntu-24.04
+    env:
+      CPULIMIT_SKIP_TIMING: ""
+    steps:
+      - uses: actions/checkout@v4
+      - run: make WERROR=1 CFLAGS="-O2 -g" check
+
+  build-docs:
+    name: install layout / man page
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          sudo apt-get update && sudo apt-get install -y mandoc
+          make man
+          make install DESTDIR="$PWD/stage" PREFIX=/usr
+          test -x stage/usr/bin/cpulimit && test -f stage/usr/share/man/man1/cpulimit.1
+          make uninstall DESTDIR="$PWD/stage" PREFIX=/usr
+          test -z "$(find stage -type f)"

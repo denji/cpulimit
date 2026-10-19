@@ -1,0 +1,37 @@
+name: bench
+
+on:
+  pull_request:
+    paths: ["src/**", "bench/**"]
+  workflow_dispatch:
+    inputs:
+      baseline:
+        description: "git ref to compare against"
+        default: "53e5dc6"
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: sudo apt-get update && sudo apt-get install -y strace
+      - name: build the baseline
+        run: |
+          ref="${{ github.event.inputs.baseline || '53e5dc6' }}"
+          git worktree add ../baseline "$ref"
+          make -C ../baseline/src cpulimit CFLAGS="-O2" || make -C ../baseline/src CFLAGS="-O2"
+      - name: build the candidate
+        run: make CFLAGS="-O2" all build/test/busy
+      - name: compare
+        run: |
+          sh bench/bench.sh ../baseline/src/cpulimit build/cpulimit build/test/busy 10 | tee bench.txt
+          { echo '```'; cat bench.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bench
+          path: bench.txt

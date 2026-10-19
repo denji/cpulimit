@@ -33,7 +33,9 @@ run cli_parse_test "$BUILD/test/cli_parse_test"
 run lock_test "$BUILD/test/lock_test"
 run cli_test env BUILD="$BUILD" sh "$dir/cli_test.sh"
 # a hung test must fail the run, not hang it
-if command -v timeout >/dev/null 2>&1; then
+if [ -n "${SKIP_INTEGRATION:-}" ]; then
+    printf 'SKIP  integration_test (SKIP_INTEGRATION set)\n'
+elif command -v timeout >/dev/null 2>&1; then
     run integration_test timeout 600 env BUILD="$BUILD" sh "$dir/integration_test.sh"
 else
     run integration_test env BUILD="$BUILD" sh "$dir/integration_test.sh"

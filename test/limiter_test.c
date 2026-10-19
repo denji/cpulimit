@@ -141,6 +141,18 @@ static void test_direction(void) {
 }
 
 /* First cycle with the limit: work/stop split follows the limit. */
+/* A bad measurement must never reach nanosleep(): NaN anywhere gives a full work slice (the
+ * safe side: the target is not held stopped on account of garbage). */
+static void test_nan_inputs(void) {
+    struct slices s;
+    compute_slices(0.5, NAN, 0.5, 100000, &s);
+    CHECK(s.rate == 1.0 && s.work_ns == 100000000 && s.stop_ns == 0);
+    compute_slices(NAN, 0.4, 0.5, 100000, &s);
+    CHECK(s.rate == 1.0 && s.stop_ns == 0);
+    compute_slices(0.5, 0.4, NAN, 100000, &s);
+    CHECK(s.rate == 1.0 && s.stop_ns == 0);
+}
+
 static void test_first_cycle(void) {
     struct slices s;
     compute_slices(0.25, -1, 0, 100000, &s);
@@ -161,5 +173,6 @@ int main(void) {
     test_matches_old_formula();
     test_direction();
     test_first_cycle();
+    test_nan_inputs();
     return 0;
 }

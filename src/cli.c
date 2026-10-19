@@ -44,7 +44,7 @@ void cli_usage(FILE *stream, const char *program_name, int ncpu) {
     fprintf(stream, "      -V, --version                show program version number\n");
     fprintf(stream, "      -z, --lazy                   exit if there is no target process, or if it dies\n");
     fprintf(stream, "      -i, --include-children       limit also the children processes\n");
-    fprintf(stream, "      -m, --minimum-limited-cpu=M  minimum percentage of cpu of target processes\n");
+    fprintf(stream, "      -m, --minimum-limited-cpu=M  processes using less than M of a CPU (0.05 = 5%%) are left running\n");
     fprintf(stream, "      -d, --daemon                 detach from the terminal and run in the background\n");
     fprintf(stream, "      -s, --syslog                 also log events to syslog\n");
     fprintf(stream, "      -P, --pidfile=FILE           write the daemon's pid to FILE (requires --daemon)\n");

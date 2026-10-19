@@ -40,7 +40,7 @@ static void verify(struct list *l, const struct model *m) {
 }
 
 static uint32_t rng = 12345;
-static uint32_t next(void) { rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5; return rng; }
+TEST_PRNG static uint32_t next(void) { rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5; return rng; }
 
 static void test_random_operations(void) {
     struct list l;

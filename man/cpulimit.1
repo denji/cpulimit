@@ -1,0 +1,132 @@
+.TH CPULIMIT 1 "2026" "cpulimit 0.3.2" "User Commands"
+.SH NAME
+cpulimit \- limit the CPU usage of a process
+.SH SYNOPSIS
+.B cpulimit
+.RI [ OPTION ]...
+.B \-p
+.I PID
+|
+.B \-e
+.I FILE
+|
+.I COMMAND
+.RI [ ARG ]...
+.SH DESCRIPTION
+.B cpulimit
+keeps the CPU use of a process, optionally with its descendants, near a given
+percentage of one CPU. It does not change scheduling priorities. It alternates
+.B SIGCONT
+and
+.B SIGSTOP
+inside short chunks of time and adjusts the share of each chunk during which the
+target may run from the CPU time it actually consumed.
+.PP
+Exactly one target must be given: a pid (\fB\-p\fR), an executable name
+(\fB\-e\fR), or a command, which is started and limited
+(\fBcpulimit \-l 50 \-\- make \-j4\fR). In command mode there is a single
+.B cpulimit
+process, the command is its child, and the exit status is the command's.
+.SH OPTIONS
+.TP
+.BR \-l ", " \-\-limit =\fIN\fR
+Allowed CPU, in percent of one CPU, from 0 to 100 times the number of CPUs
+(for example 150 on a machine with two or more). Required.
+.TP
+.BR \-p ", " \-\-pid =\fIN\fR
+Limit the process with this pid. Implies \fB\-z\fR.
+.TP
+.BR \-e ", " \-\-exe =\fIFILE\fR
+Limit the process whose executable has this name or path. A name matches the
+basename; a path matches the full path. The limiter itself is never selected.
+.TP
+.BR \-c ", " \-\-chunk\-size =\fIN\fR
+Length of the control chunk in microseconds, 1 to 1000000 (default 100000).
+Shorter chunks follow the limit more closely and cost more wake-ups.
+.TP
+.BR \-i ", " \-\-include\-children
+Also limit the descendants of the target, found again on every cycle.
+.TP
+.BR \-m ", " \-\-minimum\-limited\-cpu =\fIM\fR
+Processes using less than \fIM\fR of one CPU (0.05 means 5%) are left running
+instead of being stopped. Default 0.
+.TP
+.BR \-z ", " \-\-lazy
+Exit when there is no target, or when it terminates, instead of waiting for it.
+.TP
+.BR \-d ", " \-\-daemon
+Detach from the terminal and run in the background. Not valid with a command.
+.TP
+.BR \-P ", " \-\-pidfile =\fIFILE\fR
+Write the daemon's pid to \fIFILE\fR (requires \fB\-d\fR). A pid file naming a
+live process is refused; a stale one is replaced. It is removed on a normal exit.
+.TP
+.BR \-s ", " \-\-syslog
+Also send events to syslog(3), facility \fBLOG_DAEMON\fR.
+.TP
+.B \-\-no\-lock
+Do not refuse a target that another cpulimit is already limiting.
+.TP
+.B \-\-no\-boost
+Do not try to raise cpulimit's own scheduling priority.
+.TP
+.BR \-v ", " \-\-verbose
+Print control statistics while limiting.
+.TP
+.BR \-V ", " \-\-version
+Print the version and exit with status 0.
+.TP
+.BR \-h ", " \-\-help
+Print the usage text and exit with status 1 (as every release has).
+.SH EXIT STATUS
+.TP
+.B 0
+The limited process was released after \fBSIGINT\fR, \fBSIGTERM\fR, \fBSIGHUP\fR
+or \fBSIGQUIT\fR, \fB\-z\fR found no target, or \fB\-V\fR was given.
+.TP
+.B 1
+Usage error, a target that is already limited, or a target that is the limiter itself.
+.TP
+.B 2
+The control loop failed (for instance an allocation or a system call).
+.PP
+In command mode the exit status of the command is returned; if it was killed by
+a signal, the raw wait status is returned as before.
+.SH SIGNALS
+\fBSIGINT\fR, \fBSIGTERM\fR, \fBSIGHUP\fR and \fBSIGQUIT\fR make cpulimit send
+\fBSIGCONT\fR to every process it has been limiting and exit. A signal that was
+already ignored when cpulimit started (for example \fBSIGHUP\fR under
+\fBnohup\fR(1)) stays ignored. \fBSIGPIPE\fR is ignored.
+.SH FILES
+.TP
+.I $XDG_RUNTIME_DIR/cpulimit/
+.TQ
+.I /tmp/cpulimit\-<euid>/
+Directory of the per\-target lock files, one \fBfcntl\fR(2) record lock per
+target. The lock disappears with the process that holds it, even on \fBSIGKILL\fR.
+.SH NOTES AND LIMITATIONS
+.IP \(bu 2
+If cpulimit is killed by \fBSIGKILL\fR (or by the OOM killer) while the target is
+in its stop slice, the target stays stopped. No process can prevent this; send
+it \fBSIGCONT\fR.
+.IP \(bu 2
+Between reading a process and signalling it, its pid can in principle be
+recycled; the window is one control cycle. Processes are identified by pid and
+start time, which removes the much larger window of earlier versions.
+.IP \(bu 2
+Only Linux, macOS, FreeBSD and (best effort) Solaris/illumos have an iterator.
+Controlling processes of other users needs the privilege to signal them.
+.SH EXAMPLES
+.nf
+cpulimit \-l 50 \-p 1234
+cpulimit \-l 25 \-i \-e ffmpeg
+cpulimit \-d \-s \-P /run/cpulimit.pid \-l 30 \-e backup
+cpulimit \-l 80 \-\- make \-j8
+.fi
+.SH AUTHORS
+Angelo Marletta, and the contributors of the forks this version descends from.
+.SH SEE ALSO
+.BR kill (1),
+.BR nice (1),
+.BR cgroups (7),
+.BR signal (7)

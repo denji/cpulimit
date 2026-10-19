@@ -14,4 +14,11 @@
         } \
     } while (0)
 
+/* Test PRNGs wrap around on purpose; the integer sanitizers must not flag that (src/ is not exempt). */
+#if defined(__clang__)
+#define TEST_PRNG __attribute__((no_sanitize("unsigned-integer-overflow", "unsigned-shift-base")))
+#else
+#define TEST_PRNG
+#endif
+
 #endif

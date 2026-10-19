@@ -1,0 +1,118 @@
+name: verify
+
+on:
+  push:
+    branches: [master, main, modernize]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CPULIMIT_SKIP_TIMING: "1"
+
+jobs:
+  sanitizers:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: "gcc asan+ubsan",   cc: gcc,   san: "address,undefined,leak" }
+          - { name: "clang asan+ubsan", cc: clang, san: "address,undefined,leak" }
+          # unlike gcc, clang's integer sanitizer also traps unsigned wrap-around and implicit
+          # conversions: the number-parsing code is written so that none of them occurs
+          - { name: "clang integer",    cc: clang, san: "undefined,integer,nullability" }
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          make CC=${{ matrix.cc }} WERROR=1 \
+            CFLAGS="-O1 -g -fno-omit-frame-pointer -fsanitize=${{ matrix.san }} -fno-sanitize-recover=all" \
+            LDFLAGS="-fsanitize=${{ matrix.san }}" check
+
+  valgrind:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y valgrind
+      - run: make WERROR=1 CFLAGS="-O1 -g" all
+      - name: unit tests under valgrind
+        run: |
+          make CFLAGS="-O1 -g" $(for t in process_iterator util limiter procfs_parse group list cli_parse lock; do printf 'build/test/%s_test ' $t; done)
+          for t in process_iterator util limiter procfs_parse group list cli_parse lock; do
+            valgrind -q --leak-check=full --error-exitcode=99 build/test/${t}_test
+          done
+      - name: stress test (churn, 300 children, valgrind attach and command mode)
+        run: make stress
+
+  stress:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y valgrind
+      - run: make WERROR=1 CFLAGS="-O2 -g" stress LOAD_SECS=30
+
+  static-analysis:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y clang-tidy cppcheck clang-tools
+      - name: gcc -fanalyzer and clang-tidy
+        run: make analyze
+      - name: cppcheck
+        run: |
+          cppcheck --error-exitcode=1 --inline-suppr --enable=warning,portability,performance \
+            --std=c99 --suppress=missingIncludeSystem -I src \
+            $(ls src/*.c | grep -v 'process_iterator_\(apple\|freebsd\|solaris\)')
+      - name: scan-build
+        run: |
+          make clean
+          scan-build --status-bugs -disable-checker security.insecureAPI.DeprecatedOrUnsafeBufferHandling make all
+
+  codeql:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: c-cpp
+          queries: security-and-quality
+      - run: make all
+      - uses: github/codeql-action/analyze@v3
+
+  # Formal verification: the harnesses in verif/ state L1-L4 of the controller, exactness of the
+  # tick conversion and memory safety of the /proc/<pid>/stat parser for every input up to a bound.
+  formal-cbmc:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y cbmc
+      - name: harnesses as random tests (checks that the harnesses themselves are sound)
+        run: make verif-sim
+      - name: bounded model checking
+        run: make verif-cbmc
+
+  mutation:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sh scripts/mutation.sh
+
+  coverage:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: make coverage COV_MIN_LINES=85
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: build/cov/uncovered.txt

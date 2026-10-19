@@ -15,14 +15,12 @@ BINDIR     ?= $(PREFIX)/bin
 MANDIR     ?= $(PREFIX)/share/man/man1
 INSTALL    ?= install
 STRIP      ?= strip
-HELP2MAN   ?= help2man
 STATIC_CC  ?= musl-gcc
 CFLAGS     ?= -O2 -g
 BUILD      ?= build
 WERROR     ?=
 
-MAN_NAME   := CPU Utilization Limiter
-MAN_SOURCE := https://github.com/denji/cpulimit
+MAN_FILE   := man/$(NAME).1
 UNAME      := $(shell uname -s)
 
 SRCDIR     := src
@@ -47,17 +45,10 @@ MAIN_OBJ   := $(BUILD)/cpulimit.o
 UNIT_TESTS := process_iterator_test util_test limiter_test procfs_parse_test group_test list_test cli_parse_test lock_test
 TEST_BINS  := $(addprefix $(BUILD)/test/,$(UNIT_TESTS) busy spawn)
 
-HAVE_HELP2MAN := $(shell command -v $(HELP2MAN) 2>/dev/null)
-ifneq ($(HAVE_HELP2MAN),)
-MAN_FILE := $(BUILD)/$(NAME).1
-else
-MAN_FILE :=
-endif
-
 .PHONY: analyze verif-sim verif-cbmc stress bench fuzz-standalone fuzz-libfuzzer coverage all check test man install uninstall static static-install static_install \
         strip clean distclean FORCE
 
-all: $(BIN) $(MAN_FILE)
+all: $(BIN)
 	@cp -f $(BIN) $(COMPAT_BIN)
 
 # Rebuild everything when the compiler or any flag changes.
@@ -95,13 +86,11 @@ $(BUILD)/test/busy: $(TESTDIR)/busy.c $(BUILD)/.flags
 $(BUILD)/test/spawn: $(TESTDIR)/spawn.c $(BUILD)/.flags
 	$(CC) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -o $@ $< $(LDFLAGS)
 
-ifneq ($(MAN_FILE),)
-$(MAN_FILE): $(BIN)
-	$(HELP2MAN) -n "$(MAN_NAME)" -s 1 -S "$(MAN_SOURCE)" -N ./$(BIN) > $@
-endif
-
-man: $(MAN_FILE)
-	@test -n "$(MAN_FILE)" || echo "man: $(HELP2MAN) not found, man page skipped" >&2
+# The man page is hand-written (man/cpulimit.1); `make man` only checks that it formats.
+man:
+	@if command -v mandoc >/dev/null 2>&1; then mandoc -Tlint $(MAN_FILE); \
+	 elif command -v groff >/dev/null 2>&1; then groff -man -ww -z $(MAN_FILE); \
+	 else echo "man: no mandoc or groff, not checked" >&2; fi
 
 # "test" is also a directory name, so it must stay phony.
 check test: all $(TEST_BINS)
@@ -114,10 +103,8 @@ strip: all
 install: all
 	$(INSTALL) -d $(DESTDIR)$(BINDIR)
 	$(INSTALL) -m 755 $(BIN) $(DESTDIR)$(BINDIR)/$(NAME)
-ifneq ($(MAN_FILE),)
 	$(INSTALL) -d $(DESTDIR)$(MANDIR)
 	$(INSTALL) -m 644 $(MAN_FILE) $(DESTDIR)$(MANDIR)/$(NAME).1
-endif
 
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/$(NAME) $(DESTDIR)$(MANDIR)/$(NAME).1
@@ -139,7 +126,7 @@ clean:
 	rm -rf $(BUILD)
 
 distclean:
-	rm -rf build $(COMPAT_BIN) $(COMPAT_BIN).1
+	rm -rf build $(COMPAT_BIN)
 
 FORCE:
 

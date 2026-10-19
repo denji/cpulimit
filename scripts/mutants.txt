@@ -1,0 +1,21 @@
+# description | file | sed expression
+util: accept trailing garbage in numbers | src/util.c | s|if (\*end != '\\0') {|if (0) {|
+util: accept leading space | src/util.c | 0,/isspace((unsigned char)\*s)/s|isspace((unsigned char)\*s)|0|
+util: range check off by one (max) | src/util.c | 0,/v < min || v > max/s|v > max|v > max + 1|
+util: ignore ERANGE | src/util.c | 0,/errno == ERANGE/s|errno == ERANGE|0|
+limiter: no first-cycle start at the limit | src/limiter.c | s|rate = limit;|rate = 1;|
+limiter: wrong feedback direction | src/limiter.c | s|target / pcpu|pcpu / target|
+limiter: stop slice off by one | src/limiter.c | s|out->stop_ns = chunk_ns - out->work_ns;|out->stop_ns = chunk_ns - out->work_ns - 1;|
+limiter: NaN not mapped to 1 | src/limiter.c | s|if (rate != rate) {|if (0) {|
+procfs: parse from first ')' instead of last | src/procfs_parse.c | s|strrchr|strchr|
+procfs: ppid limit off by one | src/procfs_parse.c | s|v > 2147483647u|v > 2147483648u|
+procfs: no overflow check in digits | src/procfs_parse.c | s|v > (UINT64_MAX - d) / 10|0|
+procfs: no saturation of seconds | src/procfs_parse.c | s|seconds > (uint64_t)INT64_MAX / 1000u|0|
+procfs: ms sum not clamped | src/procfs_parse.c | s|return ms > (uint64_t)INT64_MAX ? INT64_MAX : (int64_t)ms;|return (int64_t)ms;|
+list: delete last node leaves stale last | src/list.c | s|l->last=node->previous;|l->last=node;|
+list: add to empty list keeps old first | src/list.c | s|l->first=l->last=newnode;|l->last=newnode;|
+list: key length ignored | src/list.c | s|length==0?l->keysize:length|length|
+group: pid reuse not detected (starttime ignored) | src/process_group.c | s|p->starttime != tmp_process.starttime|0|
+group: terminated processes never swept | src/process_group.c | s|p->group_seq != pgroup->generation|0|
+cli: -l upper bound off by one | src/cli.c | s|cfg->limit_pct > 100 \* ncpu|cfg->limit_pct > 100 * ncpu + 1|
+cli: chunk lower bound allows 0 | src/cli.c | s|cfg->chunk_us < 1|cfg->chunk_us < 0|

@@ -183,7 +183,7 @@ static void test_repeatable(void) {
 
 /* ---- seeded random argument vectors: no crash, and what is accepted obeys the rules ---- */
 static uint32_t rng = 0x12345678u;
-static uint32_t next_random(void) {
+TEST_PRNG static uint32_t next_random(void) {
     rng = rng * 1664525u + 1013904223u;
     return rng >> 8;
 }

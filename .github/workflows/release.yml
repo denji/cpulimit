@@ -1,0 +1,59 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  static:
+    name: static ${{ matrix.arch }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x86_64,  platform: linux/amd64 }
+          - { arch: aarch64, platform: linux/arm64 }
+          - { arch: armv7,   platform: linux/arm/v7 }
+          - { arch: i686,    platform: linux/386 }
+          - { arch: ppc64le, platform: linux/ppc64le }
+          - { arch: s390x,   platform: linux/s390x }
+          - { arch: riscv64, platform: linux/riscv64 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - name: static musl build, tests, strip
+        run: |
+          docker run --rm --platform ${{ matrix.platform }} -v "$PWD:/src" -w /src alpine:3.20 sh -ec '
+            apk add --no-cache build-base make procps coreutils bash
+            make WERROR=1 CFLAGS="-O2 -g" LDFLAGS="-static" check SKIP_INTEGRATION=1
+            make clean
+            make CFLAGS="-O2" LDFLAGS="-static" all
+            strip build/cpulimit
+            file build/cpulimit 2>/dev/null || true
+            ./build/cpulimit -V'
+          mkdir -p dist
+          cp build/cpulimit dist/cpulimit-${{ matrix.arch }}-linux-musl
+          (cd dist && sha256sum cpulimit-${{ matrix.arch }}-linux-musl > cpulimit-${{ matrix.arch }}-linux-musl.sha256)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpulimit-${{ matrix.arch }}
+          path: dist/*
+
+  publish:
+    needs: static
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

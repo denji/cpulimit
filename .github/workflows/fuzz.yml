@@ -1,0 +1,57 @@
+name: fuzz
+
+on:
+  pull_request:
+    paths: ["src/**", "fuzz/**"]
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: "seconds per target"
+        default: "600"
+
+permissions:
+  contents: read
+
+jobs:
+  libfuzzer:
+    name: libFuzzer ${{ matrix.target }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [fuzz_procfs_parse, fuzz_cli]
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y clang
+      - run: make fuzz-libfuzzer
+      - name: restore corpus
+        uses: actions/cache@v4
+        with:
+          path: corpus-${{ matrix.target }}
+          key: corpus-${{ matrix.target }}-${{ github.run_id }}
+          restore-keys: corpus-${{ matrix.target }}-
+      - name: fuzz
+        run: |
+          case ${{ matrix.target }} in
+            fuzz_procfs_parse) seeds=fuzz/corpus/procfs ;;
+            fuzz_cli) seeds=fuzz/corpus/cli ;;
+          esac
+          mkdir -p corpus-${{ matrix.target }}
+          secs=${{ github.event.inputs.seconds || (github.event_name == 'schedule' && '1200') || '60' }}
+          build/fuzz/${{ matrix.target }} -max_total_time=$secs -timeout=5 -rss_limit_mb=1024 \
+            -print_final_stats=1 -artifact_prefix=crash- corpus-${{ matrix.target }} $seeds
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: crash-${{ matrix.target }}
+          path: crash-*
+
+  # Same properties through the dependency-free driver, for a different compiler and a fixed seed:
+  # a failure here is reproducible with `make fuzz-standalone FUZZ_SEED=<n>`.
+  standalone:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: make fuzz-standalone FUZZ_ITERATIONS=2000000 FUZZ_SEED=${{ github.run_number }}
