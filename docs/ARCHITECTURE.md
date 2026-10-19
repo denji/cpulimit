@@ -108,22 +108,32 @@ dies, so there are no stale locks. `rundir` is `$XDG_RUNTIME_DIR/cpulimit` or
 `/tmp/cpulimit-<uid>`, created `0700` and verified (owner, mode, not a symlink)
 before use. Keying on the start time means a recycled pid is a different target.
 
-## 8. Verification plan
+## 8. Verification
 
 | Property | Technique | Where |
 |---|---|---|
-| Parsers reject/accept exactly the grammar | unit + property tests, libFuzzer + ASan/UBSan | `test/*_test.c`, `fuzz/` |
-| Controller invariants L1-L4 | exhaustive grid + CBMC proof | `limiter_test.c`, `verify/` |
-| `/proc` parser memory safety | libFuzzer, CBMC bounded proof | `fuzz/`, `verify/` |
-| Memory safety / leaks / UB | ASan, UBSan, valgrind, allocation-failure injection | CI `sanitizers` |
-| Process table behavior | scripted iterator (deterministic) | `group_test.c` |
-| Real limiting accuracy, signal handling, S1 | integration tests with real processes | `test/*.sh` |
-| Regressions of past defects | mutation check: each fixed defect reintroduced must fail a test | `test/mutation.sh` |
-| Concurrency / races | stress under load (many processes, churn), TSan N/A (no threads) | `test/load_test.sh` |
-| Performance | syscalls and CPU per cycle vs process count | `bench/` |
-| Portability | CI matrix: OS x compiler x libc x arch | `.github/workflows/` |
+| Parsers accept exactly the grammar | unit + property tests; libFuzzer and a standalone mutation driver, both with checked properties (not only "no crash") | `test/*_test.c`, `fuzz/` |
+| Controller invariants L1-L4, tick conversion, `/proc` parser memory safety | harnesses run as random tests (`make verif-sim`) and as bounded proofs under CBMC (`make verif-cbmc`) | `verif/` |
+| Memory safety / leaks / UB | ASan, UBSan, clang integer sanitizers, valgrind, allocation-failure injection | CI `verify` |
+| `list.c` | model-based test against an array, allocation failure | `test/list_test.c` |
+| Process table behavior | scripted iterator (deterministic) | `test/group_test.c` |
+| Limiting accuracy, signal handling, S1 | integration tests with real processes | `test/integration_test.sh` |
+| Fixed defects stay fixed | 20 mutants, each must fail a unit test | `scripts/mutation.sh` |
+| Load, leaks over time | fork/exit churn under `-i`, 300 children, RSS flat, valgrind | `test/stress_test.sh` |
+| Test adequacy | line and branch coverage by gcov, including daemon children | `scripts/coverage.sh` |
+| Static analysis | `gcc -fanalyzer` (must be silent), clang-tidy, cppcheck, scan-build, CodeQL | `make analyze`, CI |
+| Performance | accuracy, limiter CPU, syscalls/s, `-i` scaling against a baseline binary | `bench/bench.sh` |
+| Portability | CI matrix: OS x compiler x libc x architecture | `.github/workflows/` |
 
-Limits of this plan, stated up front: proofs are bounded (CBMC unwinds loops to
-a stated depth) and cover pure modules only; the macOS, FreeBSD and Solaris
-iterators are built in CI but their behavior is only exercised by the shared
-iterator tests on those hosts.
+Limits of this plan, stated up front:
+
+* CBMC proofs are bounded (loops unwound to a stated depth) and cover three pure functions only.
+  Everything else is tested, not proved. The harnesses were exercised in simulation mode and with
+  mutants; CBMC itself had not been run when this was written.
+* The macOS, FreeBSD and Solaris iterators were adapted to the shared interface without being
+  compiled by the author. CI builds them but those jobs do not gate until they have passed once.
+* Unreachable defensive clamps in `limiter.c` (lines that no input can reach) are not covered by
+  tests; the CBMC harness is what shows they are unreachable.
+* `SIGKILL` or an OOM kill of cpulimit during a stop slice leaves the target stopped, and the
+  pid can be recycled between the table update and the signal (one cycle). Neither can be fixed
+  in user space without a supervising process, which would reintroduce the orphaned-limiter defect.
