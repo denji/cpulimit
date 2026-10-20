@@ -27,6 +27,7 @@
 #define CPULIMIT_ALLOC_H
 
 #ifdef CL_ALLOC_HEADER
+// cppcheck-suppress preprocessorErrorDirective
 #include CL_ALLOC_HEADER
 #else
 #include <stdlib.h>

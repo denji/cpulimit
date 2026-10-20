@@ -24,7 +24,7 @@ for entry in $SET; do
         # unwinding covers the 64-byte buffer plus the digit loops; --unwinding-assertions makes an
         # insufficient bound a failure instead of a silent partial result
         echo "== $h"
-        cbmc "verif/$h.c" $src -D_GNU_SOURCE -Isrc -Iverif \
+        timeout "${CBMC_TIMEOUT:-1500}" cbmc "verif/$h.c" $src -D_GNU_SOURCE -Isrc -Iverif \
             --unwind 70 --unwinding-assertions \
             --bounds-check --pointer-check --div-by-zero-check \
             --signed-overflow-check --unsigned-overflow-check --conversion-check \

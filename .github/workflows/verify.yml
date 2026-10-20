@@ -91,15 +91,19 @@ jobs:
 
   # Formal verification: the harnesses in verif/ state L1-L4 of the controller, exactness of the
   # tick conversion and memory safety of the /proc/<pid>/stat parser for every input up to a bound.
+  # EXPERIMENTAL: the CBMC run has never completed (the first attempt was killed after ~4 hours of
+  # solving). Each harness gets a time limit; failing to finish is reported, not treated as a proof.
   formal-cbmc:
     runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - run: sudo apt-get update && sudo apt-get install -y cbmc
       - name: harnesses as random tests (checks that the harnesses themselves are sound)
         run: bash scripts/ci_run.sh verif-sim make verif-sim
       - name: bounded model checking
-        run: bash scripts/ci_run.sh cbmc make verif-cbmc
+        run: bash scripts/ci_run.sh cbmc make verif-cbmc CBMC_TIMEOUT=1500
 
   mutation:
     runs-on: ubuntu-24.04

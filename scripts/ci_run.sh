@@ -12,7 +12,7 @@ rc=$?
 if [ "$rc" -ne 0 ]; then
     # error and FAIL lines first (what broke), then the last lines (where it stopped)
     {
-        grep -nE 'CHECK failed|error:|warning:|\*\*\*|^FAIL|FAIL |Assertion|not found|No such file|undefined reference|Permission denied|cannot|not ok' "$log" | head -15
+        grep -nE 'ERROR:|SUMMARY:|runtime error|mandoc:|CHECK failed|error:|warning:|\*\*\*|^FAIL|FAIL |Assertion|not found|No such file|undefined reference|Permission denied|cannot|not ok' "$log" | head -15
         echo '--- last lines ---'
         tail -n 12 "$log"
     } > "$log.sum"

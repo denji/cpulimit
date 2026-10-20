@@ -219,7 +219,13 @@ track "$BP"
 "$SPAWN" "$BIN" -l 10 -e "cl_target_$$" > /dev/null 2>&1 &
 LP=$!
 track "$LP"
-saw_stopped "$BP" 6 && ok "-e: the process is found by name and limited" || bad "-e: the process was not limited"
+# under qemu-user emulation /proc/PID/cmdline starts with the emulator: nothing can match by name
+first_word=$(tr '\0' '\n' < "/proc/$BP/cmdline" 2>/dev/null | head -n 1)
+if [ -r "/proc/$BP/cmdline" ] && [ "$first_word" != "$WORK/cl_target_$$" ]; then
+    printf 'skip  -e by name (cmdline starts with "%s": emulated process)\n' "$first_word"
+else
+    saw_stopped "$BP" 6 && ok "-e: the process is found by name and limited" || bad "-e: the process was not limited"
+fi
 kill -TERM "$LP"; wait_for 3 gone "$LP"; wait "$LP" 2>/dev/null
 kill -9 "$BP"; wait "$BP" 2>/dev/null
 

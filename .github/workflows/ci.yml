@@ -120,7 +120,7 @@ jobs:
       - run: |
           # mandoc is a lint, not a requirement: without it `make man` falls back to groff or skips
           sudo apt-get update && sudo apt-get install -y mandoc || echo "mandoc not installed"
-          make man
+          bash scripts/ci_run.sh man make man
           make install DESTDIR="$PWD/stage" PREFIX=/usr
           test -x stage/usr/bin/cpulimit && test -f stage/usr/share/man/man1/cpulimit.1
           make uninstall DESTDIR="$PWD/stage" PREFIX=/usr

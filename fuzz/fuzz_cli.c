@@ -3,7 +3,8 @@
  * Properties checked on every successful parse (the validated configuration is what the rest of
  * the program trusts, so these are the preconditions it relies on):
  *   C1  exactly one target is selected: -p, -e or a command
- *   C2  0 <= limit_pct <= 100 * ncpu, 1 <= chunk_us <= CL_MAX_CHUNK_US, 0 <= min_cpu <= ncpu
+ *   C2  0 <= limit_pct <= 100 * ncpu, 1 <= chunk_us <= CL_MAX_CHUNK_US,
+ *       min_cpu a finite number >= 0 (no upper bound: -m is a threshold, and every release accepted any value)
  *   C3  command_start, when set, indexes a word inside argv
  *   C4  a pid target is positive, and below pid_max when that is known
  *   C5  a daemon never takes a command, -P implies -d
@@ -72,7 +73,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
             FAIL("C1 not exactly one target");
         }
         if (c1.limit_pct < 0 || c1.limit_pct > 100 * ncpu || c1.chunk_us < 1 ||
-            c1.chunk_us > CL_MAX_CHUNK_US || !(c1.min_cpu >= 0.0) || c1.min_cpu > (double)ncpu) {
+            c1.chunk_us > CL_MAX_CHUNK_US || !(c1.min_cpu >= 0.0) || !isfinite(c1.min_cpu)) {
             FAIL("C2 value out of range");
         }
         if (c1.command_start != 0 && (c1.command_start < 1 || c1.command_start >= argc)) {
