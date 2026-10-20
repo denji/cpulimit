@@ -21,6 +21,7 @@ env:
 jobs:
   # Linux: operating system x compiler, optimisation level, warnings are errors.
   linux:
+    timeout-minutes: 30
     name: ${{ matrix.os }} / ${{ matrix.cc }} / ${{ matrix.opt }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -37,6 +38,7 @@ jobs:
 
   # C standard / feature-test-macro coverage: the code must not rely on gnu extensions silently.
   standards:
+    timeout-minutes: 30
     name: gcc -std=${{ matrix.std }}
     runs-on: ubuntu-24.04
     strategy:
@@ -49,6 +51,7 @@ jobs:
 
   # musl libc (Alpine) on the architectures Alpine publishes, via qemu user emulation.
   alpine:
+    timeout-minutes: 30
     name: alpine musl / ${{ matrix.platform }}
     runs-on: ubuntu-24.04
     strategy:
@@ -70,6 +73,7 @@ jobs:
   # author (no such host was available), so these two jobs report but do not gate until they
   # have gone green once. Remove `continue-on-error` then.
   macos:
+    timeout-minutes: 30
     name: ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     continue-on-error: true
@@ -85,6 +89,7 @@ jobs:
         run: bash scripts/ci_run.sh "macos tests" make CFLAGS="-O2 -g" check SKIP_INTEGRATION=1
 
   freebsd:
+    timeout-minutes: 30
     name: freebsd ${{ matrix.version }}
     runs-on: ubuntu-24.04
     continue-on-error: true
@@ -104,6 +109,7 @@ jobs:
 
   # Real timing: one job, one compiler, nothing else running, so the numbers mean something.
   timing:
+    timeout-minutes: 30
     name: accuracy (timing checks)
     runs-on: ubuntu-24.04
     env:
@@ -113,6 +119,7 @@ jobs:
       - run: make WERROR=1 CFLAGS="-O2 -g" check
 
   build-docs:
+    timeout-minutes: 30
     name: install layout / man page
     runs-on: ubuntu-24.04
     steps:

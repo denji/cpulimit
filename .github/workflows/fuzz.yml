@@ -16,6 +16,7 @@ permissions:
 
 jobs:
   libfuzzer:
+    timeout-minutes: 30
     name: libFuzzer ${{ matrix.target }}
     runs-on: ubuntu-24.04
     strategy:
@@ -51,6 +52,7 @@ jobs:
   # Same properties through the dependency-free driver, for a different compiler and a fixed seed:
   # a failure here is reproducible with `make fuzz-standalone FUZZ_SEED=<n>`.
   standalone:
+    timeout-minutes: 30
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4

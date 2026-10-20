@@ -18,6 +18,7 @@ env:
 
 jobs:
   sanitizers:
+    timeout-minutes: 30
     name: ${{ matrix.name }}
     runs-on: ubuntu-24.04
     strategy:
@@ -37,6 +38,7 @@ jobs:
             LDFLAGS="-fsanitize=${{ matrix.san }}" check
 
   valgrind:
+    timeout-minutes: 30
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -52,6 +54,7 @@ jobs:
         run: make stress
 
   stress:
+    timeout-minutes: 30
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -59,6 +62,7 @@ jobs:
       - run: make WERROR=1 CFLAGS="-O2 -g" stress LOAD_SECS=30
 
   static-analysis:
+    timeout-minutes: 30
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -76,6 +80,7 @@ jobs:
           scan-build --status-bugs -disable-checker security.insecureAPI.DeprecatedOrUnsafeBufferHandling make all
 
   codeql:
+    timeout-minutes: 30
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -91,27 +96,35 @@ jobs:
 
   # Formal verification: the harnesses in verif/ state L1-L4 of the controller, exactness of the
   # tick conversion and memory safety of the /proc/<pid>/stat parser for every input up to a bound.
-  # EXPERIMENTAL: the CBMC run has never completed (the first attempt was killed after ~4 hours of
-  # solving). Each harness gets a time limit; failing to finish is reported, not treated as a proof.
+  # EXPERIMENTAL: no CBMC run has completed yet (the first one starved and lost the runner). One job
+  # per harness, a memory ulimit and a time limit each, so a harness that does not finish is
+  # reported on its own and is not mistaken for a proof.
   formal-cbmc:
+    name: cbmc ${{ matrix.harness }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 60
     continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        harness: [verify_limiter, verify_ticks, verify_parse_stat]
     steps:
       - uses: actions/checkout@v4
       - run: sudo apt-get update && sudo apt-get install -y cbmc
-      - name: harnesses as random tests (checks that the harnesses themselves are sound)
-        run: bash scripts/ci_run.sh verif-sim make verif-sim
+      - name: harness as a random test (checks that the harness itself is sound)
+        run: make verif-sim
       - name: bounded model checking
-        run: bash scripts/ci_run.sh cbmc make verif-cbmc CBMC_TIMEOUT=1500
+        run: bash scripts/ci_run.sh "cbmc ${{ matrix.harness }}" make verif-cbmc VERIF_ONLY=${{ matrix.harness }} CBMC_TIMEOUT=2700
 
   mutation:
+    timeout-minutes: 30
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - run: sh scripts/mutation.sh
 
   coverage:
+    timeout-minutes: 30
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4

@@ -1,4 +1,7 @@
-/* parse_proc_stat() on every NUL-terminated string of up to MAXLEN bytes:
+/* parse_proc_stat() on every NUL-terminated string of up to MAXLEN (48) bytes. The shortest line
+ * that reaches field 22 is 46 bytes ("1 (x) S 0 0 ... 0": 22 one-character fields), so the bound
+ * covers every field, but only with short numbers: long numbers (overflow of the 64-bit parse)
+ * are covered by the fuzzer and the unit tests, not by this proof.
  *   - never reads outside the buffer, never overflows (CBMC --bounds-check --pointer-check
  *     --unsigned-overflow-check --signed-overflow-check --conversion-check)
  *   - returns 0 or -1; on -1 *out is unchanged
@@ -12,7 +15,7 @@
 #include "procfs_parse.h"
 
 #ifndef MAXLEN
-#define MAXLEN 80
+#define MAXLEN 48
 #endif
 
 #ifndef __CPROVER
@@ -42,7 +45,7 @@ static void one(void)
     if (nondet_uchar() & 1) {
         /* half of the samples start from a well-formed line and are then damaged, otherwise random
          * bytes almost never get past field 3 and the deep fields would go untested */
-        static const char *const good = "12 (a b) S 1 3 4 5 6 7 8 9 10 11 120 130 14 15 16 17 18 19 2000 21 22";
+        static const char *const good = "1 (a) S 1 2 3 4 5 6 7 8 9 1 2 3 4 5 6 7 8 9 1 2";
         size_t k, damage = (size_t)(nondet_uchar() % 4);
         len = strlen(good);
         if (len > MAXLEN) {

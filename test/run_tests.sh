@@ -12,11 +12,17 @@ run() {
     shift
     total=$((total + 1))
     printf 'RUN   %s\n' "$name"
-    if "$@"; then
+    # a hung test must fail the run instead of holding it (and the CI job) for hours
+    if command -v timeout >/dev/null 2>&1; then
+        timeout "${TEST_TIMEOUT:-900}" "$@"
+    else
+        "$@"
+    fi
+    rc=$?
+    if [ "$rc" -eq 0 ]; then
         printf 'PASS  %s\n' "$name"
     else
-        rc=$?
-        printf 'FAIL  %s (exit status %d)\n' "$name" "$rc"
+        printf 'FAIL  %s (exit status %d%s)\n' "$name" "$rc" "$([ "$rc" -eq 124 ] && echo ', timed out')"
         failed=$((failed + 1))
     fi
 }
@@ -32,11 +38,8 @@ run list_test "$BUILD/test/list_test"
 run cli_parse_test "$BUILD/test/cli_parse_test"
 run lock_test "$BUILD/test/lock_test"
 run cli_test env BUILD="$BUILD" sh "$dir/cli_test.sh"
-# a hung test must fail the run, not hang it
 if [ -n "${SKIP_INTEGRATION:-}" ]; then
     printf 'SKIP  integration_test (SKIP_INTEGRATION set)\n'
-elif command -v timeout >/dev/null 2>&1; then
-    run integration_test timeout 600 env BUILD="$BUILD" sh "$dir/integration_test.sh"
 else
     run integration_test env BUILD="$BUILD" sh "$dir/integration_test.sh"
 fi

@@ -88,7 +88,7 @@ $(BUILD)/test/spawn: $(TESTDIR)/spawn.c $(BUILD)/.flags
 
 # The man page is hand-written (man/cpulimit.1); `make man` only checks that it formats.
 man:
-	@if command -v mandoc >/dev/null 2>&1; then mandoc -Tlint $(MAN_FILE); \
+	@if command -v mandoc >/dev/null 2>&1; then mandoc -Tlint -Wwarning $(MAN_FILE); \
 	 elif command -v groff >/dev/null 2>&1; then groff -man -ww -z $(MAN_FILE); \
 	 else echo "man: no mandoc or groff, not checked" >&2; fi
 

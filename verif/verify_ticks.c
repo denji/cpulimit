@@ -16,11 +16,18 @@ static void one(void)
     if (hz <= 0) {
         assert(got == 0);
     } else {
-        unsigned __int128 want = (unsigned __int128)ticks * 1000u / (uint64_t)hz;
-        if (want > (unsigned __int128)INT64_MAX) {
-            want = INT64_MAX;
+        /* The specification is "floor(ticks * 1000 / hz), saturated at INT64_MAX". Stated with
+         * multiplications only, which the solver handles far better than a 128-bit division:
+         *     got * hz <= ticks * 1000 < (got + 1) * hz          when not saturated,
+         *     got == INT64_MAX and (INT64_MAX) * hz <= ticks * 1000   when saturated. */
+        unsigned __int128 num = (unsigned __int128)ticks * 1000u;
+        unsigned __int128 h = (unsigned __int128)(uint64_t)hz;
+        if (got == INT64_MAX) {
+            assert((unsigned __int128)INT64_MAX * h <= num);
+        } else {
+            assert((unsigned __int128)got * h <= num);
+            assert(num < ((unsigned __int128)got + 1u) * h);
         }
-        assert((unsigned __int128)got == want);
     }
 #ifdef __CPROVER
     return 0;

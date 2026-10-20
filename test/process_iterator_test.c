@@ -62,10 +62,12 @@ static pid_t spawn_idle(void) {
     pid_t pid = fork();
     CHECK(pid >= 0);
     if (pid == 0) {
+        TEST_DIE_WITH_PARENT();
         for (;;) {
             pause();
         }
     }
+    test_track_child(pid);
     return pid;
 }
 
@@ -174,9 +176,11 @@ void test_process_group_single(int include_children) {
     child = fork();
     CHECK(child >= 0);
     if (child == 0) {
+        TEST_DIE_WITH_PARENT();
         //child is supposed to be killed by the parent :/
         while (1);
     }
+    test_track_child(child);
     signal(SIGABRT, &kill_child);
     signal(SIGTERM, &kill_child);
     CHECK(init_process_group(&pgroup, child, include_children) == 0);
@@ -203,33 +207,6 @@ void test_process_group_single(int include_children) {
     }
     CHECK(close_process_group(&pgroup) == 0);
     reap(child);
-}
-
-/* Under qemu-user emulation (a foreign-architecture container) /proc/<pid>/cmdline starts with the
- * emulator, not with this program, so nothing that matches processes by their command can work.
- * Say so and skip those tests instead of failing on the environment. */
-static int argv0_visible(const char *argv0) {
-#ifdef __linux__
-    char buf[PATH_MAX + 1];
-    ssize_t n;
-    int fd = open("/proc/self/cmdline", O_RDONLY);
-    if (fd < 0) {
-        return 1;
-    }
-    n = read(fd, buf, sizeof(buf) - 1);
-    close(fd);
-    if (n <= 0) {
-        return 1;
-    }
-    buf[n] = '\0';
-    if (strcmp(buf, argv0) != 0) {
-        fprintf(stderr, "note: /proc/self/cmdline starts with '%s', not '%s' (emulator?): command matching tests skipped\n", buf, argv0);
-        return 0;
-    }
-#else
-    (void)argv0;
-#endif
-    return 1;
 }
 
 void test_process_name(const char *command) {
@@ -298,6 +275,7 @@ void test_hostile_process_name() {
     kid = fork();
     CHECK(kid >= 0);
     if (kid == 0) {
+        TEST_DIE_WITH_PARENT();
         prctl(PR_SET_NAME, "a b) (c S 1 2", 0, 0, 0);
         byte = 'x';
         if (write(ready[1], &byte, 1) != 1) {
@@ -307,6 +285,7 @@ void test_hostile_process_name() {
             pause();
         }
     }
+    test_track_child(kid);
     CHECK(read(ready[0], &byte, 1) == 1);
     close(ready[0]);
     close(ready[1]);
@@ -361,6 +340,7 @@ static void chain(int depth) {
         if (fork() != 0) {
             break;  //the parent stays at its level
         }
+        TEST_DIE_WITH_PARENT();
         depth--;
     }
     for (;;) {
@@ -374,9 +354,11 @@ void test_deep_descendants() {
     int attempt, count = 0;
     CHECK(top >= 0);
     if (top == 0) {
+        TEST_DIE_WITH_PARENT();
         setpgid(0, 0);  //so the whole chain can be killed at once
         chain(3);       //top, child, grandchild, great-grandchild
     }
+    test_track_child(top);
     for (attempt = 0; attempt < 100; attempt++) {  //the chain is created asynchronously
         struct process_iterator it;
         struct process process;
@@ -398,6 +380,36 @@ void test_deep_descendants() {
     waitpid(top, NULL, 0);
 }
 
+/* Under qemu-user emulation (a foreign-architecture container) /proc/<pid>/cmdline of another
+ * process starts with the emulator, not with the program, so a process cannot be found by its
+ * command. qemu fakes /proc/self and /proc/<own pid>, so ask about the CHILD from here. */
+static int cmdline_starts_with(pid_t pid, const char *argv0) {
+#ifdef __linux__
+    char path[64], buf[PATH_MAX + 1];
+    ssize_t n;
+    int fd;
+    snprintf(path, sizeof(path), "/proc/%ld/cmdline", (long)pid);
+    fd = open(path, O_RDONLY);
+    if (fd < 0) {
+        return 1;
+    }
+    n = read(fd, buf, sizeof(buf) - 1);
+    close(fd);
+    if (n <= 0) {
+        return 1;
+    }
+    buf[n] = '\0';
+    if (strcmp(buf, argv0) != 0) {
+        fprintf(stderr, "note: another process's cmdline starts with '%s', not '%s' (emulator?): find-by-name tests skipped\n", buf, argv0);
+        return 0;
+    }
+#else
+    (void)pid;
+    (void)argv0;
+#endif
+    return 1;
+}
+
 //find_process_by_name() used to call kill(-1, SIGCONT): every process of the user was resumed
 void test_find_by_name(const char *argv0) {
     pid_t kid = fork();
@@ -405,10 +417,16 @@ void test_find_by_name(const char *argv0) {
     int found;
     CHECK(kid >= 0);
     if (kid == 0) {
+        TEST_DIE_WITH_PARENT();
         raise(SIGSTOP);
         _exit(0);
     }
+    test_track_child(kid);
     CHECK(waitpid(kid, &status, WUNTRACED) == kid && WIFSTOPPED(status));
+    if (!cmdline_starts_with(kid, argv0)) {
+        reap(kid);
+        return;
+    }
     found = find_process_by_name(base_name(argv0));
     CHECK(found > 0);                 //this very program matches
     CHECK(find_process_by_name(argv0) > 0 || strchr(argv0, '/') == NULL);  //by path, when given one
@@ -431,7 +449,6 @@ void test_find_by_pid() {
 }
 
 int main(int argc, char **argv) {
-    int visible;
     (void)argc;
     test_single_process();
     test_multiple_process();
@@ -440,17 +457,12 @@ int main(int argc, char **argv) {
     test_process_group_single(0);
     test_process_group_single(1);
     test_process_group_wrong_pid();
-    visible = argv0_visible(argv[0]);
-    if (visible) {
-        test_process_name(argv[0]);
-    }
+    test_process_name(argv[0]);
     test_command_is_opt_in();
     test_hostile_process_name();
     test_zombie_is_not_reported();
     test_deep_descendants();
-    if (visible) {
-        test_find_by_name(argv[0]);
-    }
+    test_find_by_name(argv[0]);
     test_find_by_pid();
     return 0;
 }

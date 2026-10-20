@@ -46,8 +46,12 @@ static struct holder start_holder(pid_t target, int64_t start, const char *dir) 
     CHECK(pipe(ready) == 0 && pipe(release) == 0);
     h.pid = fork();
     CHECK(h.pid >= 0);
+    if (h.pid > 0) {
+        test_track_child(h.pid);
+    }
     if (h.pid == 0) {
         int fd;
+        TEST_DIE_WITH_PARENT();
         close(ready[0]);
         close(release[1]);
         if (target_lock_acquire(target, start, dir, &fd, NULL) != LOCK_ACQUIRED) {
