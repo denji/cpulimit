@@ -29,14 +29,21 @@ for h in $SET; do
         # unwinding covers the 64-byte buffer plus the digit loops; --unwinding-assertions makes an
         # insufficient bound a failure instead of a silent partial result
         echo "== $h"
-        # an out-of-memory CBMC must die alone, not take the CI runner with it
-        ulimit -v "${CBMC_MEM_KB:-12000000}" 2>/dev/null || true
-        timeout "${CBMC_TIMEOUT:-1500}" cbmc "verif/$h.c" $src -DVERIF_CBMC=1 -D_GNU_SOURCE -Isrc -Iverif \
+        # A virtual-memory ulimit is only applied when asked for (CBMC_MEM_KB): address-space limits
+        # make C++ programs fail in ways that look like crashes. Line-buffered output keeps what
+        # cbmc printed before it died, and its exit status is reported, because a process killed
+        # by a signal prints nothing (the first conclusive CI run ended silently mid-solve).
+        if [ -n "${CBMC_MEM_KB:-}" ]; then ulimit -v "$CBMC_MEM_KB" 2>/dev/null || true; fi
+        stdbuf -oL -eL timeout "${CBMC_TIMEOUT:-1500}" cbmc "verif/$h.c" $src -DVERIF_CBMC=1 -D_GNU_SOURCE -Isrc -Iverif \
             --unwind $unwind --unwinding-assertions \
             --bounds-check --pointer-check --div-by-zero-check \
             --signed-overflow-check --unsigned-overflow-check --conversion-check \
             --pointer-overflow-check --undefined-shift-check --float-overflow-check --nan-check \
-            --object-bits 12 || status=1
+            --object-bits 12 && rc=0 || rc=$?
+        if [ "$rc" -ne 0 ]; then
+            echo "cbmc $h: exit status $rc (10 = property violated, 6 = unsupported/internal error, 124 = timeout, 137 = SIGKILL (out of memory?), 139 = SIGSEGV)"
+            status=1
+        fi
         ;;
     *) echo "usage: $0 sim|cbmc" >&2; exit 2 ;;
     esac
