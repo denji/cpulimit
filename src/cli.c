@@ -99,7 +99,12 @@ enum cli_result cli_parse(int argc, char **argv, int ncpu, long pid_max, struct 
     }
 
     /* getopt keeps its position in globals: reset so the function can be called again */
-    optind = 0;
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__)
+    optreset = 1;  /* BSD libc: optind alone does not restart the scan */
+    optind = 1;
+#else
+    optind = 0;    /* glibc and musl: 0 re-initialises all internal getopt state */
+#endif
     /* getopt writes its own messages ("invalid option -- 'x'") to the real stderr, exactly as
      * the program always did; for any other stream (tests, fuzzing) we write the message */
     opterr = (err == stderr);

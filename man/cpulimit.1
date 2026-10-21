@@ -100,10 +100,10 @@ already ignored when cpulimit started (for example \fBSIGHUP\fR under
 .SH FILES
 .TP
 .I $XDG_RUNTIME_DIR/cpulimit/
-.TQ
+Directory of the per\-target lock files; when \fBXDG_RUNTIME_DIR\fR is unset,
 .I /tmp/cpulimit\-<euid>/
-Directory of the per\-target lock files, one \fBfcntl\fR(2) record lock per
-target. The lock disappears with the process that holds it, even on \fBSIGKILL\fR.
+is used. Each target has one file holding a \fBfcntl\fR(2) record lock. The lock
+disappears with the process that holds it, even on \fBSIGKILL\fR.
 .SH NOTES AND LIMITATIONS
 .IP \(bu 2
 If cpulimit is killed by \fBSIGKILL\fR (or by the OOM killer) while the target is
