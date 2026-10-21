@@ -31,7 +31,7 @@ for h in $SET; do
         echo "== $h"
         # an out-of-memory CBMC must die alone, not take the CI runner with it
         ulimit -v "${CBMC_MEM_KB:-12000000}" 2>/dev/null || true
-        timeout "${CBMC_TIMEOUT:-1500}" cbmc "verif/$h.c" $src -D_GNU_SOURCE -Isrc -Iverif \
+        timeout "${CBMC_TIMEOUT:-1500}" cbmc "verif/$h.c" $src -DVERIF_CBMC=1 -D_GNU_SOURCE -Isrc -Iverif \
             --unwind $unwind --unwinding-assertions \
             --bounds-check --pointer-check --div-by-zero-check \
             --signed-overflow-check --unsigned-overflow-check --conversion-check \

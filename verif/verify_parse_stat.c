@@ -18,11 +18,11 @@
 #define MAXLEN 48
 #endif
 
-#ifndef __CPROVER
+#ifndef VERIF_CBMC
 static long accepted; /* how many samples were valid lines: shows the sample space is not vacuous */
 #endif
 
-#ifdef __CPROVER
+#ifdef VERIF_CBMC
 int main(void)
 #else
 static void one(void)
@@ -33,15 +33,15 @@ static void one(void)
     size_t i, len;
     int rc;
     len = (size_t)nondet_uchar();
-#ifndef __CPROVER
+#ifndef VERIF_CBMC
     len %= MAXLEN + 1;
 #endif
     VERIF_ASSUME(len <= MAXLEN);
     for (i = 0; i < len; i++) {
-        buf[i] = (char)nondet_statchar();
+        buf[i] = nondet_statchar();
         VERIF_ASSUME(buf[i] != '\0');
     }
-#ifndef __CPROVER
+#ifndef VERIF_CBMC
     if (nondet_uchar() & 1) {
         /* half of the samples start from a well-formed line and are then damaged, otherwise random
          * bytes almost never get past field 3 and the deep fields would go untested */
@@ -53,7 +53,7 @@ static void one(void)
         }
         memcpy(buf, good, len);
         for (k = 0; k < damage; k++) {
-            buf[(size_t)nondet_uchar() % len] = (char)nondet_statchar();
+            buf[(size_t)nondet_uchar() % len] = nondet_statchar();
         }
         for (k = 0; k < len; k++) {
             if (buf[k] == '\0') {
@@ -63,8 +63,8 @@ static void one(void)
     }
 #endif
     buf[len] = '\0';
-    before.state = (char)nondet_uchar();
-    before.ppid = (pid_t)nondet_long();
+    before.state = nondet_char();
+    before.ppid = nondet_pid();
     before.utime = nondet_u64();
     before.stime = nondet_u64();
     before.starttime = nondet_u64();
@@ -76,16 +76,16 @@ static void one(void)
                after.stime == before.stime && after.starttime == before.starttime);
     } else {
         assert(after.ppid >= 0);
-#ifndef __CPROVER
+#ifndef VERIF_CBMC
         accepted++;
 #endif
     }
-#ifdef __CPROVER
+#ifdef VERIF_CBMC
     return 0;
 #endif
 }
 
-#ifndef __CPROVER
+#ifndef VERIF_CBMC
 int main(int argc, char **argv) {
     long n = argc > 1 ? atol(argv[1]) : 1000000, i;
     for (i = 0; i < n; i++) one();

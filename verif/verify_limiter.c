@@ -10,7 +10,7 @@
 #include "limiter.h"
 #include "util.h"
 
-#ifdef __CPROVER
+#ifdef VERIF_CBMC
 int main(void)
 #else
 static void one(void)
@@ -40,12 +40,12 @@ static void one(void)
     if (pcpu >= 0 && pcpu <= prev * limit) {                                /* idle process: run fully */
         assert(s.rate == 1.0);
     }
-#ifdef __CPROVER
+#ifdef VERIF_CBMC
     return 0;
 #endif
 }
 
-#ifndef __CPROVER
+#ifndef VERIF_CBMC
 int main(int argc, char **argv) {
     long n = argc > 1 ? atol(argv[1]) : 2000000, i;
     for (i = 0; i < n; i++) one();

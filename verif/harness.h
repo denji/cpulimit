@@ -10,6 +10,10 @@
  *     sample and assert() is a plain assert. That is random testing of the SAME property: it
  *     finds a violated property and shows the harness itself is sound, it proves nothing.
  *
+ * The mode is chosen by VERIF_CBMC, which scripts/verif.sh passes to cbmc with -D. (CBMC does not
+ * reliably predefine a macro of its own for this, and a harness that silently compiled the PRNG
+ * branch under cbmc would "prove" a single fixed pseudo-random run.)
+ *
  * Keep the two modes honest: a harness must not do anything that only makes sense in one. */
 #ifndef CPULIMIT_VERIF_HARNESS_H
 #define CPULIMIT_VERIF_HARNESS_H
@@ -17,13 +21,16 @@
 #include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <sys/types.h>
 
-#ifdef __CPROVER
+#ifdef VERIF_CBMC
 unsigned char nondet_uchar(void);
-#define nondet_statchar nondet_uchar
+#define nondet_statchar nondet_char
 uint64_t nondet_u64(void);
 int64_t nondet_i64(void);
 long nondet_long(void);
+char nondet_char(void);
+pid_t nondet_pid(void);
 double nondet_double(void);
 #define VERIF_ASSUME(c) __CPROVER_assume(c)
 #else
@@ -57,12 +64,19 @@ static VERIF_UNUSED int64_t nondet_i64(void) {
     uint64_t v = verif_u64();
     return (verif_next() & 1) ? (int64_t)v : (int64_t)(0 - v); /* unsigned negate: no signed overflow */
 }
+/* same-width reinterpretation, no value conversion (a narrowing conversion is what
+ * --conversion-check is there to flag in the code under test, not in the harness) */
+static VERIF_UNUSED char nondet_char(void) { unsigned char u = (unsigned char)verif_next(); char c; memcpy(&c, &u, 1); return c; }
+static VERIF_UNUSED pid_t nondet_pid(void) { uint64_t u = verif_next(); pid_t p; memcpy(&p, &u, sizeof(p)); return p; }
 static VERIF_UNUSED long nondet_long(void) { return (long)nondet_i64(); }
 /* a byte from the alphabet of a stat line, so random strings reach the deep fields too */
-static VERIF_UNUSED unsigned char nondet_statchar(void) {
+static VERIF_UNUSED char nondet_statchar(void) {
     static const char alpha[] = " ()0123456789 0123456789 SRZ-";
     uint64_t r = verif_next();
-    return (r & 7) == 0 ? (unsigned char)(r >> 8) : (unsigned char)alpha[(r >> 8) % (sizeof(alpha) - 1)];
+    if ((r & 7) == 0) {
+        return nondet_char();
+    }
+    return alpha[(r >> 8) % (sizeof(alpha) - 1)];
 }
 static VERIF_UNUSED double nondet_double(void) {
     static const double edge[] = { 0.0, -0.0, 1.0, 0.5, 100.0, 1e-300, 4.9e-324, 1e300, 1.7976931348623157e308 };

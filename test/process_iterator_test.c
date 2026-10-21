@@ -429,7 +429,14 @@ void test_find_by_name(const char *argv0) {
     }
     found = find_process_by_name(base_name(argv0));
     CHECK(found > 0);                 //this very program matches
-    CHECK(find_process_by_name(argv0) > 0 || strchr(argv0, '/') == NULL);  //by path, when given one
+    {
+        //by path, when given one. The documented form is an absolute path: Linux reports the
+        //command as it was typed, macOS and the BSDs report the resolved path of the executable
+        char abs[PATH_MAX];
+        if (strchr(argv0, '/') != NULL) {
+            CHECK(find_process_by_name(argv0) > 0 || (realpath(argv0, abs) != NULL && find_process_by_name(abs) > 0));
+        }
+    }
     CHECK(find_process_by_name("") == 0);
     CHECK(find_process_by_name("no-such-program-xyzzy") == 0);
     //the stopped child must still be stopped

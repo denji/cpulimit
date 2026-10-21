@@ -3,7 +3,7 @@
 #include "harness.h"
 #include "procfs_parse.h"
 
-#ifdef __CPROVER
+#ifdef VERIF_CBMC
 int main(void)
 #else
 static void one(void)
@@ -29,12 +29,12 @@ static void one(void)
             assert(num < ((unsigned __int128)got + 1u) * h);
         }
     }
-#ifdef __CPROVER
+#ifdef VERIF_CBMC
     return 0;
 #endif
 }
 
-#ifndef __CPROVER
+#ifndef VERIF_CBMC
 int main(int argc, char **argv) {
     long n = argc > 1 ? atol(argv[1]) : 2000000, i;
     for (i = 0; i < n; i++) one();
