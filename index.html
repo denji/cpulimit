@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>cpulimit · CPU usage limiter for Linux, BSD, macOS</title>
+<meta name="description" content="cpulimit keeps the CPU use of a process near a percentage of one CPU using SIGSTOP/SIGCONT and a feedback controller. Daemon mode, syslog, single-limiter lock, static builds.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="canonical" href="https://denji.github.io/cpulimit/">
+<link rel="stylesheet" href="style.css">
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="brand" href="#">cpulimit</a>
+  <nav aria-label="Sections">
+    <a href="#install">Install</a><a href="#usage">Usage</a><a href="#how">How it works</a><a href="#new">What's new</a><a href="#verification">Verification</a><a href="https://github.com/denji/cpulimit">GitHub</a>
+  </nav>
+  <button id="theme" type="button" aria-label="Toggle colour theme">theme</button>
+</div></header>
+
+<main>
+<div class="wrap hero">
+  <h1>Limit the CPU of a process without touching its priority.</h1>
+  <p class="lead">cpulimit alternates <code>SIGSTOP</code> and <code>SIGCONT</code> within short chunks and corrects the duty cycle from the CPU time the target actually used, so the limit follows system load. Made for batch jobs that must not eat the machine.</p>
+  <div class="btns">
+    <a class="btn p" href="#install">Install</a>
+    <a class="btn" href="https://github.com/denji/cpulimit">Source</a>
+    <a class="btn" href="https://github.com/denji/cpulimit/blob/master/docs/ARCHITECTURE.md">Architecture</a>
+  </div>
+  <div class="cp"><pre><code><span class="c"># an existing process: half a CPU</span>
+cpulimit -l 50 -p 1234
+<span class="c"># by name, with its children</span>
+cpulimit -l 25 -i -e ffmpeg
+<span class="c"># start a command and limit it; the exit status is the command's</span>
+cpulimit -l 80 -- make -j8
+<span class="c"># background daemon with syslog and a pid file</span>
+cpulimit -d -s -P /run/cpulimit.pid -l 30 -e backup</code></pre></div>
+</div>
+
+<section id="install"><div class="wrap">
+  <h2>Install</h2>
+  <p class="sub">GNU make and a C compiler. Use <code>gmake</code> on the BSDs and illumos. The build is non-recursive, keeps objects in <code>build/</code>, rebuilds when flags change and never overrides your <code>CFLAGS</code>.</p>
+  <div class="two">
+    <div class="cp"><pre><code>make &amp;&amp; sudo make install
+<span class="c"># PREFIX=/usr/local; DESTDIR=, BINDIR=, MANDIR= honoured</span>
+make check
+<span class="c"># unit, CLI and integration tests</span>
+make static STATIC_CC=musl-gcc
+<span class="c"># static binary in build/static/</span></code></pre></div>
+    <div class="tw"><table>
+      <tr><th>Platform</th><th>Status</th></tr>
+      <tr><td>Linux (glibc, musl)</td><td><span class="tag ok">tested</span> x86_64 by the author; CI also targets arm64 and musl on 7 architectures under qemu</td></tr>
+      <tr><td>macOS, FreeBSD</td><td><span class="tag w">experimental</span> iterators ported but not verified on real hardware by the author; CI jobs are advisory</td></tr>
+      <tr><td>Solaris / illumos</td><td><span class="tag w">best effort</span> not built by the author</td></tr>
+    </table></div>
+  </div>
+  <p class="sub" style="margin-top:1rem">Tagged releases are meant to carry static musl binaries (x86_64, aarch64, armv7, i686, ppc64le, s390x, riscv64); the release workflow has not been exercised yet.</p>
+</div></section>
+
+<section id="usage"><div class="wrap">
+  <h2>Usage</h2>
+  <p class="sub">Exactly one target: <code>-p PID</code>, <code>-e NAME_OR_PATH</code> or a <code>COMMAND [ARGS]</code>. Full details, exit statuses and signals: <code>man cpulimit</code>.</p>
+  <div class="tw"><table>
+    <tr><th>Option</th><th>Meaning</th></tr>
+    <tr><td><code>-l, --limit=N</code></td><td>percent of one CPU, 0 to 100 × CPUs (required)</td></tr>
+    <tr><td><code>-c, --chunk-size=N</code></td><td>control chunk in microseconds, 1..1000000 (default 100000)</td></tr>
+    <tr><td><code>-i, --include-children</code></td><td>also limit descendants</td></tr>
+    <tr><td><code>-m, --minimum-limited-cpu=M</code></td><td>processes using less than M of a CPU (0.05 = 5%) are left running</td></tr>
+    <tr><td><code>-z, --lazy</code></td><td>exit when there is no target or it dies</td></tr>
+    <tr><td><code>-d, --daemon</code></td><td>detach and run in the background</td></tr>
+    <tr><td><code>-s, --syslog</code></td><td>also log to syslog</td></tr>
+    <tr><td><code>-P, --pidfile=FILE</code></td><td>daemon pid file (needs <code>-d</code>); a stale file is replaced, a live one refused</td></tr>
+    <tr><td><code>--no-lock</code></td><td>allow a target that another cpulimit already limits</td></tr>
+    <tr><td><code>--no-boost</code></td><td>do not raise cpulimit's own priority</td></tr>
+    <tr><td><code>-v, -V, -h</code></td><td>verbose, version, help (<code>-h</code> exits 1, as it always did)</td></tr>
+  </table></div>
+</div></section>
+
+<section id="how"><div class="wrap">
+  <h2>How it works</h2>
+  <p class="sub">Each chunk (100 ms by default) is split into a run slice and a stop slice. After every chunk the controller compares the CPU time the target really used with the limit and adjusts the next split.</p>
+  <figure>
+    <svg class="duty" viewBox="0 0 720 96" role="img" aria-label="Three chunks, each a run slice followed by a stop slice; the run slice shrinks as measured usage exceeds the limit">
+      <line class="ln" x1="10" y1="60" x2="710" y2="60"/>
+      <g><rect class="run" x="10" y="26" width="140" height="34"/><rect class="stop" x="150" y="26" width="80" height="34"/>
+         <rect class="run" x="240" y="26" width="110" height="34"/><rect class="stop" x="350" y="26" width="110" height="34"/>
+         <rect class="run" x="470" y="26" width="100" height="34"/><rect class="stop" x="570" y="26" width="140" height="34"/></g>
+      <text x="14" y="18">chunk 1: SIGCONT</text><text x="154" y="18">SIGSTOP</text>
+      <text x="244" y="18">chunk 2</text><text x="474" y="18">chunk 3</text>
+      <text x="14" y="84">measured usage above the limit, so each next run slice is shorter</text>
+    </svg>
+    <figcaption>Illustration of the idea, not measured data.</figcaption>
+  </figure>
+  <div class="grid" style="margin-top:1.2rem">
+    <div class="card"><h3>Process identity</h3><p>Targets are tracked by pid <em>and</em> start time, so a recycled pid is not limited by mistake.</p></div>
+    <div class="card"><h3>Safe signals</h3><p>The handler only sets a flag. Signals are blocked except inside <code>pselect()</code>, so there is no lost-wakeup window. <code>SIGINT/TERM/HUP/QUIT</code> release every limited process and exit 0.</p></div>
+    <div class="card"><h3>Monotonic clock</h3><p>Timing uses <code>CLOCK_MONOTONIC</code>, so wall-clock steps cannot distort the duty cycle.</p></div>
+    <div class="card"><h3>Never strand a target</h3><p>Every code path that stops a process has a matching continue, including exit and error paths. Controller invariants are in <a href="https://github.com/denji/cpulimit/blob/master/docs/ARCHITECTURE.md">ARCHITECTURE.md</a>.</p></div>
+  </div>
+</div></section>
+
+<section id="new"><div class="wrap">
+  <h2>What's new</h2>
+  <p class="sub">Compared with the original code base. Log lines, exit statuses and <code>-p -e -l -c -i -m -v -z</code> are kept for existing scripts. Features from <a href="https://github.com/denji/cpulimit/issues/1">issue #1</a>.</p>
+  <div class="grid">
+    <div class="card"><h3>Daemon mode</h3><p><code>-d</code> double-forks and detaches; <code>-P</code> writes a pid file and refuses to start when a live one exists.</p></div>
+    <div class="card"><h3>Syslog</h3><p><code>-s</code> sends every log line to syslog in addition to the console output, with the matching priority.</p></div>
+    <div class="card"><h3>One limiter per target</h3><p>A second cpulimit on the same process is refused (exit 1) and names the first, since two limiters undo each other. It is an <code>fcntl</code> record lock, so it disappears with its holder even on <code>SIGKILL</code>. <code>--no-lock</code> overrides.</p></div>
+    <div class="card"><h3>Command mode is one process</h3><p><code>cpulimit -l 50 cmd</code> forks the command and runs the loop itself. The exit status is the command's; no separate limiter is left behind.</p></div>
+    <div class="card"><h3>Strict options</h3><p>Long options and range-checked numbers: <code>-l 5x</code> and <code>-l abc</code> are rejected, <code>-m</code> no longer crashes, a zero or huge chunk size no longer spins.</p></div>
+    <div class="card"><h3>Less kernel time</h3><p>The Linux <code>/proc</code> reader parses strictly and reads the command only when needed. In one run on a 2-CPU VM: 215 → 88 syscalls/s for one target; limiter CPU 4.9% → 2.4% with 200 children under <code>-i</code>.</p></div>
+    <div class="card"><h3>Static builds</h3><p><code>make static</code> with musl; CI cross-builds and tests on arm64, armv7, i386, ppc64le, s390x, riscv64 under qemu.</p></div>
+    <div class="card"><h3>Build and docs</h3><p>One non-recursive Makefile, GitHub Actions instead of Travis, a man page, and an architecture document.</p></div>
+  </div>
+  <div class="note"><strong>Accuracy is not improved.</strong> Both versions use the same controller and both under-deliver at low limits and overshoot near 50%. The gains are overhead and correctness. Benchmarks are a single run on a shared VM with a 10 ms clock tick; treat differences of a point or two as noise (<code>make bench</code>).</div>
+</div></section>
+
+<section id="verification"><div class="wrap">
+  <h2>Verification</h2>
+  <p class="sub">Everything here is in the repository and wired into CI. Local results are from a Linux x86_64 development host; the CI results are not all in yet.</p>
+  <div class="tw"><table>
+    <tr><th>Technique</th><th>Covers</th></tr>
+    <tr><td>Unit, CLI, integration (<code>make check</code>)</td><td>iterator, controller, <code>/proc</code> parser, process table, list, CLI, lock, 55 end-to-end checks with real processes</td></tr>
+    <tr><td>Sanitizers</td><td>ASan + UBSan on gcc and clang; clang integer sanitizers</td></tr>
+    <tr><td>Fuzzing</td><td>stat parser and CLI parser against stated properties (libFuzzer in CI, a standalone driver locally)</td></tr>
+    <tr><td>Bounded model checking</td><td>CBMC harnesses for the controller invariants, tick conversion exactness and parser memory safety. <span class="tag w">experimental</span></td></tr>
+    <tr><td>Mutation testing</td><td>20 re-introduced defects, all detected locally</td></tr>
+    <tr><td>Coverage</td><td>gcov with a line-coverage gate, daemon children included</td></tr>
+    <tr><td>Stress and valgrind</td><td>fork/exit churn under <code>-i</code>, no leaks, nothing left stopped</td></tr>
+    <tr><td>Static analysis</td><td><code>gcc -fanalyzer</code>, clang-tidy, cppcheck, CodeQL</td></tr>
+  </table></div>
+  <div class="note"><strong>Limits of the claim.</strong> No CBMC run has completed successfully yet, so nothing is "proved". The harnesses cover three pure functions, not the control loop or signal handling. There is no Frama-C/ACSL specification. macOS, FreeBSD and Solaris builds, and real syslog delivery, are not verified by the author.</div>
+  <h3 style="margin-top:1.5rem">Known limitations</h3>
+  <ul>
+    <li>If cpulimit is killed with <code>SIGKILL</code> (or by the OOM killer) during a stop slice, the target stays stopped. Send it <code>SIGCONT</code>.</li>
+    <li>A pid can be recycled between reading a process and signalling it. Start-time identity closes the long window; one control cycle remains.</li>
+    <li>A multi-threaded target is limited as a whole, not per thread.</li>
+    <li><code>-m</code> is a fraction of a CPU (0.05) while <code>-l</code> is a percentage.</li>
+  </ul>
+</div></section>
+</main>
+
+<footer><div class="wrap">
+  <p>Originally by <a href="https://github.com/opsengine">Angelo Marletta</a>; this fork is maintained at <a href="https://github.com/denji/cpulimit">denji/cpulimit</a>. See <a href="https://github.com/denji/cpulimit/blob/master/LICENSE">LICENSE</a>. Contributions and issues are welcome on GitHub.</p>
+</div></footer>
+
+<script>
+(function(){
+  document.querySelectorAll('.cp').forEach(function(box){
+    var pre=box.querySelector('pre'),b=document.createElement('button');
+    b.type='button';b.textContent='copy';
+    b.addEventListener('click',function(){
+      var txt=pre.innerText;
+      (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(function(){b.textContent='copied'},function(){b.textContent='select + copy'});
+      setTimeout(function(){b.textContent='copy'},1500);
+    });
+    box.appendChild(b);
+  });
+  var t=document.getElementById('theme');
+  t.addEventListener('click',function(){
+    var cur=document.documentElement.dataset.theme||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');
+    var next=cur==='dark'?'light':'dark';
+    document.documentElement.dataset.theme=next;
+    try{localStorage.setItem('theme',next)}catch(e){}
+  });
+})();
+</script>
+</body>
+</html>
