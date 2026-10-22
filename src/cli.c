@@ -26,7 +26,7 @@
 #include "cli.h"
 #include "util.h"
 
-#define VERSION "1.0.0"
+#define VERSION "1.0.1"
 
 /* long-only options (no short form) */
 enum { OPT_NO_LOCK = 256, OPT_NO_BOOST };

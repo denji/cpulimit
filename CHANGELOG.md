@@ -5,6 +5,30 @@ All notable changes to this fork of cpulimit. Format follows
 [Semantic Versioning](https://semver.org/). The command-line interface and the exit statuses
 documented in `man cpulimit` are the public interface that 1.x keeps stable.
 
+## [1.0.1] - 2026-10-22
+
+Maintenance release: one internal fix found by the bounded model checker, and verification work.
+No change to options, exit statuses or log text.
+
+### Fixed
+- `compute_slices()` computed `0 / NaN` when the measured CPU usage was a NaN and the previous
+  duty cycle was zero, then mapped the NaN to "run fully" afterwards. It now takes the division
+  only when it is a real quotient below 1: `(target < pcpu) ? target / pcpu : 1`. The result is the
+  same for every input, and no NaN or infinity is produced. (A measured usage cannot be a NaN in
+  normal operation; this is a defect of the arithmetic, not of observed behaviour.)
+
+### Changed
+- Verification harnesses (`verif/`): the CBMC jobs now report how CBMC ended and stop at the
+  first violated property with a trace; `verify_ticks` and `verify_parse_stat` use smaller bounded
+  domains (clock rates below 1.8e16 and parser inputs up to 24 bytes under CBMC; the full range stays
+  in the randomized simulation and the unit tests); new `verify_parse_stat_line` asserts that state,
+  ppid, utime, stime and starttime come from exactly fields 3, 4, 14, 15 and 22 of a well-formed
+  line. `CBMC_SOLVER=auto` selects CaDiCaL when the installed CBMC offers it.
+- Release workflow: `1.0.1` and `v1.0.1` style tags both trigger it, the tag must equal the version
+  built, and the release body is taken from this file.
+- The CBMC jobs had not completed successfully when this entry was written; nothing is claimed
+  proved.
+
 ## [1.0.0] - 2026-10-21
 
 First release of the fork after the redesign. Starts from the upstream 0.3.2 code base.
@@ -58,4 +82,5 @@ First release of the fork after the redesign. Starts from the upstream 0.3.2 cod
 - The release workflow (static musl binaries for seven architectures) had not been run when this
   entry was written.
 
+[1.0.1]: https://github.com/denji/cpulimit/releases/tag/1.0.1
 [1.0.0]: https://github.com/denji/cpulimit/releases/tag/1.0.0
