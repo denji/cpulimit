@@ -37,3 +37,14 @@ footer{border-top:1px solid var(--line);padding:2rem 0 3rem;color:var(--mut);fon
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 .two>*,.cp,.tw{min-width:0;max-width:100%}
 .hero .cp{display:block}
+.ver{color:var(--mut);font-size:.95rem;margin:-.8rem 0 1.4rem}
+svg.chart{width:100%;height:auto;display:block}
+svg.chart text{fill:var(--fg);font:12px var(--mono)}
+svg.chart .ax{fill:var(--mut)}svg.chart .lab{font:13px system-ui,sans-serif}svg.chart .strong{font-weight:700}
+svg.chart .val{font-size:11.5px}
+svg.chart .grid{stroke:var(--line);stroke-width:1}svg.chart .zero{stroke:var(--mut);stroke-width:1.2}
+svg.chart .bar.old{fill:var(--stop);stroke:var(--mut);stroke-width:1}svg.chart .bar.new{fill:var(--run)}svg.chart .bar.warn{fill:var(--warn)}
+svg.chart .bar.fail{fill:var(--warn-bg);stroke:var(--warn);stroke-width:2;stroke-dasharray:4 3}
+svg.chart .tick{stroke:var(--fg);stroke-width:2}svg.chart .gate{stroke:var(--mut);stroke-width:1.2;stroke-dasharray:5 4}
+section[id]{scroll-margin-top:4rem}
+figure{overflow-x:auto}svg.chart{min-width:620px}

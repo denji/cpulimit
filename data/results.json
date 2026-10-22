@@ -1,0 +1,150 @@
+{
+  "benchmark": {
+    "source": "bench/bench.sh, one run, 2-CPU virtual machine (Linux 6.18, CLK_TCK=100), 8 s per case, 2026-10-21; baseline = upstream 0.3.2 (53e5dc6), candidate = this fork before 1.0.0",
+    "limits": [
+      10,
+      25,
+      50,
+      75,
+      90
+    ],
+    "share_baseline": [
+      7.2,
+      24.0,
+      53.1,
+      74.3,
+      89.5
+    ],
+    "share_now": [
+      7.2,
+      23.2,
+      52.1,
+      74.3,
+      89.5
+    ],
+    "overhead": [
+      {
+        "label": "system calls per second, one target",
+        "unit": "calls/s",
+        "baseline": 212,
+        "now": 88
+      },
+      {
+        "label": "limiter CPU, one target",
+        "unit": "% of one CPU",
+        "baseline": 0.25,
+        "now": 0.12
+      },
+      {
+        "label": "limiter CPU, -i with 200 children",
+        "unit": "% of one CPU",
+        "baseline": 4.99,
+        "now": 2.37
+      }
+    ]
+  },
+  "coverage": {
+    "source": "scripts/coverage.sh (gcov), 2026-10-21, make check including daemon children",
+    "gate_lines": 85,
+    "files": [
+      {
+        "name": "cli.c",
+        "lines": 100.0,
+        "branches": 98.5
+      },
+      {
+        "name": "list.c",
+        "lines": 100.0,
+        "branches": 100.0
+      },
+      {
+        "name": "procfs_parse.c",
+        "lines": 98.7,
+        "branches": 98.2
+      },
+      {
+        "name": "util.c",
+        "lines": 97.0,
+        "branches": 94.2
+      },
+      {
+        "name": "process_group.c",
+        "lines": 96.9,
+        "branches": 85.4
+      },
+      {
+        "name": "log.c",
+        "lines": 92.6,
+        "branches": 61.1
+      },
+      {
+        "name": "process_iterator.c",
+        "lines": 89.1,
+        "branches": 78.9
+      },
+      {
+        "name": "limiter.c",
+        "lines": 88.9,
+        "branches": 83.3
+      },
+      {
+        "name": "lock.c",
+        "lines": 84.5,
+        "branches": 67.7
+      },
+      {
+        "name": "cpulimit.c",
+        "lines": 80.3,
+        "branches": 68.3
+      },
+      {
+        "name": "daemon.c",
+        "lines": 72.6,
+        "branches": 55.3
+      }
+    ],
+    "total_lines": 89.2,
+    "total_branches": 78.6
+  },
+  "ci": {
+    "source": "GitHub check runs of commit cf66c4f (master), read through the API on 2026-10-22",
+    "groups": [
+      {
+        "name": "Linux glibc, x86_64 and arm64",
+        "passed": 18,
+        "failed": 0
+      },
+      {
+        "name": "C standards gnu99 to gnu2x",
+        "passed": 4,
+        "failed": 0
+      },
+      {
+        "name": "musl, 7 architectures",
+        "passed": 7,
+        "failed": 0
+      },
+      {
+        "name": "macOS 14/15, FreeBSD 14.1",
+        "passed": 3,
+        "failed": 0
+      },
+      {
+        "name": "sanitizers, valgrind, analysis",
+        "passed": 7,
+        "failed": 0
+      },
+      {
+        "name": "fuzz, coverage, mutation, docs",
+        "passed": 7,
+        "failed": 0
+      },
+      {
+        "name": "CBMC harnesses",
+        "passed": 0,
+        "failed": 3
+      }
+    ],
+    "total_checks": 49
+  }
+}
