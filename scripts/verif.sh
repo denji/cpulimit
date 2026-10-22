@@ -15,7 +15,7 @@ status=0
 for h in $SET; do
     case $h in
     verify_limiter) src="src/limiter.c"; unwind=3 ;;
-    verify_ticks) src="src/procfs_parse.c"; unwind=3 ;;
+    verify_ticks) src="src/procfs_parse.c"; unwind=1001 ;;   # the absurd-clock-rate path of ticks_to_ms loops 1000 times
     verify_parse_stat) src="src/procfs_parse.c"; unwind=50 ;;   # MAXLEN 48 + 2
     *) echo "unknown harness $h" >&2; exit 2 ;;
     esac
@@ -35,7 +35,7 @@ for h in $SET; do
         # by a signal prints nothing (the first conclusive CI run ended silently mid-solve).
         if [ -n "${CBMC_MEM_KB:-}" ]; then ulimit -v "$CBMC_MEM_KB" 2>/dev/null || true; fi
         stdbuf -oL -eL timeout "${CBMC_TIMEOUT:-1500}" cbmc "verif/$h.c" $src -DVERIF_CBMC=1 -D_GNU_SOURCE -Isrc -Iverif \
-            --unwind $unwind --unwinding-assertions \
+            --unwind $unwind --unwinding-assertions --stop-on-fail --trace \
             --bounds-check --pointer-check --div-by-zero-check \
             --signed-overflow-check --unsigned-overflow-check --conversion-check \
             --pointer-overflow-check --undefined-shift-check --float-overflow-check --nan-check \

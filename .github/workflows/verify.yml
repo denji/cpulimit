@@ -114,7 +114,7 @@ jobs:
       - name: harness as a random test (checks that the harness itself is sound)
         run: make verif-sim
       - name: bounded model checking
-        run: bash scripts/ci_run.sh "cbmc ${{ matrix.harness }}" make verif-cbmc VERIF_ONLY=${{ matrix.harness }} CBMC_TIMEOUT=2700
+        run: bash scripts/ci_run.sh "cbmc ${{ matrix.harness }}" make verif-cbmc VERIF_ONLY=${{ matrix.harness }} CBMC_TIMEOUT=1500
 
   mutation:
     timeout-minutes: 30
