@@ -28,11 +28,12 @@ void compute_slices(double limit, double pcpu, double prev_rate, long chunk_us, 
         rate = limit;
     } else {
         //scale the previous rate by how far the measured usage is from the limit:
-        //rate = prev_rate * limit / pcpu, which is clamped to 1 below. When the quotient would
-        //reach 1 (this includes an idle process, pcpu == 0, and the denormal usage an idle
-        //process decays to) the division is skipped, so it can never divide by zero or overflow.
+        //rate = prev_rate * limit / pcpu, which is clamped to 1 below. The division happens only
+        //when it is a real quotient below 1: an idle process (pcpu == 0), the denormal usage it
+        //decays to, and a NaN measurement all take the "run fully" side, so no NaN or infinity is
+        //ever produced (the form "target >= pcpu ? 1 : target / pcpu" divided 0 by a NaN pcpu).
         double target = prev_rate * limit;
-        rate = (target >= pcpu) ? 1 : target / pcpu;
+        rate = (target < pcpu) ? target / pcpu : 1;
     }
     if (rate != rate) {
         rate = 1;  //NaN

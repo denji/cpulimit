@@ -10,13 +10,14 @@ OUT=${BUILD:-build}/verif
 mkdir -p "$OUT"
 N=${VERIF_SAMPLES:-2000000}
 # harness:sources
-SET="${VERIF_ONLY:-verify_limiter verify_ticks verify_parse_stat}"
+SET="${VERIF_ONLY:-verify_limiter verify_ticks verify_parse_stat verify_parse_stat_line}"
 status=0
 for h in $SET; do
     case $h in
     verify_limiter) src="src/limiter.c"; unwind=3 ;;
-    verify_ticks) src="src/procfs_parse.c"; unwind=1001 ;;   # the absurd-clock-rate path of ticks_to_ms loops 1000 times
-    verify_parse_stat) src="src/procfs_parse.c"; unwind=50 ;;   # MAXLEN 48 + 2
+    verify_ticks) src="src/procfs_parse.c"; unwind=3 ;;   # the 1000-iteration path is excluded by the harness under cbmc
+    verify_parse_stat) src="src/procfs_parse.c"; unwind=26 ;;   # MAXLEN 24 + 2 under cbmc
+    verify_parse_stat_line) src="src/procfs_parse.c"; unwind=50 ;;   # 45-byte line, strrchr and the field loop
     *) echo "unknown harness $h" >&2; exit 2 ;;
     esac
     case $mode in
@@ -34,12 +35,28 @@ for h in $SET; do
         # cbmc printed before it died, and its exit status is reported, because a process killed
         # by a signal prints nothing (the first conclusive CI run ended silently mid-solve).
         if [ -n "${CBMC_MEM_KB:-}" ]; then ulimit -v "$CBMC_MEM_KB" 2>/dev/null || true; fi
-        stdbuf -oL -eL timeout "${CBMC_TIMEOUT:-1500}" cbmc "verif/$h.c" $src -DVERIF_CBMC=1 -D_GNU_SOURCE -Isrc -Iverif \
-            --unwind $unwind --unwinding-assertions --stop-on-fail --trace \
-            --bounds-check --pointer-check --div-by-zero-check \
-            --signed-overflow-check --unsigned-overflow-check --conversion-check \
-            --pointer-overflow-check --undefined-shift-check --float-overflow-check --nan-check \
-            --object-bits 12 && rc=0 || rc=$?
+        # CBMC_SOLVER: empty = CBMC's default (MiniSAT 2.2.1, 2010); "auto" = --cadical when this
+        # cbmc lists it, falling back to the default if the option is refused; or any cbmc option.
+        solver=${CBMC_SOLVER:-}
+        if [ "$solver" = auto ]; then
+            solver=; cbmc --help 2>&1 | grep -q -- '--cadical' && solver=--cadical
+        fi
+        attempt=1
+        while :; do
+            echo "solver option: ${solver:-<default>}"
+            stdbuf -oL -eL timeout "${CBMC_TIMEOUT:-1500}" cbmc "verif/$h.c" $src -DVERIF_CBMC=1 -D_GNU_SOURCE -Isrc -Iverif $solver \
+                --unwind $unwind --unwinding-assertions --stop-on-fail --trace \
+                --bounds-check --pointer-check --div-by-zero-check \
+                --signed-overflow-check --unsigned-overflow-check --conversion-check \
+                --pointer-overflow-check --undefined-shift-check --float-overflow-check --nan-check \
+                --object-bits 12 && rc=0 || rc=$?
+            # exit 1 / 6 = the option or the input was refused: retry once with the default solver
+            if [ -n "$solver" ] && [ "$attempt" -eq 1 ] && { [ "$rc" -eq 1 ] || [ "$rc" -eq 6 ]; }; then
+                echo "cbmc refused '$solver' (exit $rc), retrying with the default solver"
+                solver=; attempt=2; continue
+            fi
+            break
+        done
         if [ "$rc" -ne 0 ]; then
             echo "cbmc $h: exit status $rc (10 = property violated, 6 = unsupported/internal error, 124 = timeout, 137 = SIGKILL (out of memory?), 139 = SIGSEGV)"
             status=1

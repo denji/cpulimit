@@ -15,7 +15,15 @@
 #include "procfs_parse.h"
 
 #ifndef MAXLEN
+#ifdef VERIF_CBMC
+/* nested loops are unwound to the same bound, so the formula grows with its square: 48 bytes gave
+ * 3M variables and 17M clauses and timed out. 24 bytes cannot hold a complete line (the shortest
+ * has 45), so this harness proves the REJECTION paths: no out-of-bounds read, *out untouched.
+ * The accepting path is proved by verify_parse_stat_line.c. */
+#define MAXLEN 24
+#else
 #define MAXLEN 48
+#endif
 #endif
 
 #ifndef VERIF_CBMC

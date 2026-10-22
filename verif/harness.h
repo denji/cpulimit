@@ -21,6 +21,7 @@
 #include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 #include <sys/types.h>
 
 #ifdef VERIF_CBMC
@@ -33,6 +34,10 @@ char nondet_char(void);
 pid_t nondet_pid(void);
 double nondet_double(void);
 #define VERIF_ASSUME(c) __CPROVER_assume(c)
+/* a value from a small range: constrained by an assumption here, drawn directly in the simulation
+ * (an assumption on a random byte would discard nearly every sample and test nothing) */
+static unsigned char nondet_digit(void) { unsigned char d = nondet_uchar(); __CPROVER_assume(d <= 9); return d; }
+static unsigned char nondet_upper(void) { unsigned char c = nondet_uchar(); __CPROVER_assume(c >= 'A' && c <= 'Z'); return c; }
 #else
 #include <math.h>
 #include <stdio.h>
@@ -86,6 +91,8 @@ static VERIF_UNUSED double nondet_double(void) {
     if (r % 8 == 2) return edge[(r >> 8) % (sizeof(edge) / sizeof(edge[0]))];
     return (double)(verif_next() >> 11) / (double)(1ULL << 53) * pow(10.0, (double)((int)(verif_next() % 40) - 20));
 }
+static VERIF_UNUSED unsigned char nondet_digit(void) { return (unsigned char)(verif_next() % 10); }
+static VERIF_UNUSED unsigned char nondet_upper(void) { return (unsigned char)('A' + verif_next() % 26); }
 /* an unsatisfied assumption discards this sample (the caller returns) */
 #define VERIF_ASSUME(c) do { if (!(c)) return; } while (0)
 #endif

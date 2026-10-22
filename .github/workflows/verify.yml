@@ -107,14 +107,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        harness: [verify_limiter, verify_ticks, verify_parse_stat]
+        harness: [verify_limiter, verify_ticks, verify_parse_stat, verify_parse_stat_line]
     steps:
       - uses: actions/checkout@v4
       - run: sudo apt-get update && sudo apt-get install -y cbmc
       - name: harness as a random test (checks that the harness itself is sound)
         run: make verif-sim
       - name: bounded model checking
-        run: bash scripts/ci_run.sh "cbmc ${{ matrix.harness }}" make verif-cbmc VERIF_ONLY=${{ matrix.harness }} CBMC_TIMEOUT=1500
+        run: bash scripts/ci_run.sh "cbmc ${{ matrix.harness }}" make verif-cbmc VERIF_ONLY=${{ matrix.harness }} CBMC_TIMEOUT=1500 CBMC_SOLVER=auto
 
   mutation:
     timeout-minutes: 30

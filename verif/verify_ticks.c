@@ -11,7 +11,15 @@ static void one(void)
 {
     uint64_t ticks = nondet_u64();
     long hz = nondet_long();
-    int64_t got = ticks_to_ms(ticks, hz);
+    int64_t got;
+#ifdef VERIF_CBMC
+    /* Above UINT64_MAX / 1000 ticks_to_ms() divides by 1000 repeated additions, a loop that makes
+     * the formula too large for the solver (the first CBMC runs timed out). That path is covered by
+     * the full-range simulation (make verif-sim) and by test/procfs_parse_test.c; the bounded proof
+     * is for every clock rate below it. */
+    VERIF_ASSUME(hz <= 18446744073709551L);
+#endif
+    got = ticks_to_ms(ticks, hz);
     assert(got >= 0);
     if (hz <= 0) {
         assert(got == 0);
