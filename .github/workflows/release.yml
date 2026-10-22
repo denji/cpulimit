@@ -2,7 +2,8 @@ name: release
 
 on:
   push:
-    tags: ["v*"]
+    # "1.0.0" and "v1.0.0" are both release tags
+    tags: ["[0-9]*.[0-9]*.[0-9]*", "v[0-9]*.[0-9]*.[0-9]*"]
   workflow_dispatch:
 
 permissions:
@@ -29,7 +30,7 @@ jobs:
       - uses: docker/setup-qemu-action@v3
       - name: static musl build, tests, strip
         run: |
-          docker run --rm --platform ${{ matrix.platform }} -v "$PWD:/src" -w /src alpine:3.20 sh -ec '
+          docker run --rm --platform ${{ matrix.platform }} -e RELEASE_TAG="${{ github.ref_type == 'tag' && github.ref_name || '' }}" -v "$PWD:/src" -w /src alpine:3.20 sh -ec '
             apk add --no-cache build-base make procps coreutils bash
             make WERROR=1 CFLAGS="-O2 -g" LDFLAGS="-static" check SKIP_INTEGRATION=1
             make clean
@@ -48,14 +49,24 @@ jobs:
   publish:
     timeout-minutes: 30
     needs: static
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.ref_type == 'tag'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/download-artifact@v4
         with:
           path: dist
           merge-multiple: true
+      - uses: actions/checkout@v4
+        with:
+          path: src
+      - name: release notes from CHANGELOG.md
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          awk -v v="$v" '$0 ~ "^## \\[" v "\\]" { on = 1; next } on && /^## \[/ { exit } on' src/CHANGELOG.md > notes.md
+          test -s notes.md || { echo "no CHANGELOG entry for $v" >&2; exit 1; }
+          cat notes.md
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*
+          body_path: notes.md
           generate_release_notes: true

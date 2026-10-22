@@ -38,6 +38,7 @@ run list_test "$BUILD/test/list_test"
 run cli_parse_test "$BUILD/test/cli_parse_test"
 run lock_test "$BUILD/test/lock_test"
 run cli_test env BUILD="$BUILD" sh "$dir/cli_test.sh"
+run version_test env BUILD="$BUILD" sh "$dir/version_test.sh"
 if [ -n "${SKIP_INTEGRATION:-}" ]; then
     printf 'SKIP  integration_test (SKIP_INTEGRATION set)\n'
 else

@@ -27,13 +27,14 @@ make check                         # unit, CLI and integration tests
 GNU make is required (`gmake` on the BSDs and illumos). The build is non-recursive, keeps objects in
 `build/`, rebuilds when flags change, and never overrides your `CFLAGS`. `make install` does not
 call `sudo`. Prebuilt static musl binaries (x86_64, aarch64, armv7, i686, ppc64le, s390x, riscv64)
-are attached to tagged releases.
+are attached to tagged releases (the release workflow has not been run yet; see [CHANGELOG.md](CHANGELOG.md)).
 
 | Platform | Status |
 |---|---|
-| Linux (glibc, musl) | built and tested by the author on x86_64; CI on x86_64 and arm64 |
-| macOS, FreeBSD | iterators ported to the new interface **but never compiled by the author**; CI jobs are advisory until they pass |
-| Solaris / illumos | same, best effort |
+| Linux (glibc) | tested on x86_64 by the author; CI passes on x86_64 and arm64, gcc and clang, -O0/-O2/-O3, `-std=gnu99` to `gnu2x` |
+| Linux (musl) | CI builds and runs the tests on x86_64, i386, arm64, armv7, ppc64le, s390x and riscv64 (qemu-user for all but x86_64) |
+| macOS 14/15, FreeBSD 14.1 | build and unit tests pass in CI; **the author has no such machine**, so nothing was tried by hand. These jobs stay `continue-on-error` |
+| Solaris / illumos | **never built**, best effort |
 
 ## Usage
 
@@ -88,19 +89,20 @@ The design is described, with the invariants the code is tested against, in
 
 ## Verification
 
-Everything below is in the repository and is run by CI. "Run here" means it was executed while
-developing this version; the CI workflows themselves have not run yet.
+Everything below is in the repository and is run by CI. "Here" means it was executed on the
+author's Linux x86_64 machine while developing this version; the last commit checked in CI
+(cf66c4f) passed every job except the three CBMC jobs (see below).
 
 | Technique | What it checks | Result |
 |---|---|---|
 | `make check` | 10 suites: iterator, utils, controller, parser, process table, list, CLI, lock, CLI end-to-end, 55 integration checks with real processes | passing: gcc and clang `-O2 -Werror`, ASan+UBSan, clang integer sanitizers |
-| Fuzzing (`make fuzz-standalone`, `make fuzz-libfuzzer`) | `/proc/<pid>/stat` parser and CLI parser with checked properties | 300k+ mutations per target clean here; the harness found one real bug (below). libFuzzer itself is not installable here, so only the standalone driver was run |
-| `make verif-sim`, `make verif-cbmc` | invariants of the controller, exactness of tick conversion, parser memory safety | simulation run here, found one real bug; CBMC proofs are in CI only |
+| Fuzzing (`make fuzz-standalone`, `make fuzz-libfuzzer`) | `/proc/<pid>/stat` parser and CLI parser with checked properties | standalone driver: 300k+ mutations per target clean here; libFuzzer jobs pass in CI. The harness found one real bug (below) |
+| `make verif-sim`, `make verif-cbmc` | invariants of the controller, exactness of tick conversion, parser memory safety | simulation passes and found one real bug. **The CBMC jobs currently fail** and are experimental, so nothing is claimed proved (see below) |
 | `scripts/mutation.sh` | 20 re-introduced defects | 20/20 detected after two new tests |
-| `scripts/coverage.sh` | gcov line/branch coverage, daemon children included | 89.4% lines, 78.8% branches (gate: 85% lines) |
+| `scripts/coverage.sh` | gcov line/branch coverage, daemon children included | 89.2% lines, 78.6% branches (gate: 85% lines) |
 | `make stress` | 15 s fork/exit churn under `-i`, 300 children, no leaks, nothing left stopped, valgrind clean | passing |
 | `make analyze` | `gcc -fanalyzer`, clang-tidy | clean |
-| cppcheck, scan-build, CodeQL | | CI only |
+| cppcheck, CodeQL | | pass in CI |
 
 Bugs found by this process rather than by inspection: `ticks_to_ms()` returned a negative number
 for `ticks = 2^63 + 1` at 1000 Hz and saturated wrongly for clock rates above 1.8e16 (neither
@@ -108,10 +110,14 @@ reachable with a real `CLK_TCK`), and the original parsed `-l` with `atoi`.
 
 ### Not verified
 
-* macOS, FreeBSD, Solaris builds; musl and non-x86 targets; real syslog delivery.
-* cppcheck, CBMC, Frama-C, AFL++, libFuzzer were unavailable where this was developed.
-* No ACSL/Frama-C specification exists; "formal verification" here means CBMC bounded proofs of
-  three pure functions, not of the control loop or the signal handling.
+* macOS, FreeBSD, Solaris on real hardware; Solaris builds at all; real syslog delivery.
+* musl on non-x86 runs under qemu-user, which fakes parts of `/proc`; some process-name tests are
+  skipped there.
+* **CBMC:** the three harnesses (controller invariants, tick conversion, `stat` parser) run in CI
+  but the jobs fail: CBMC ends without a verdict and the cause is not yet known. Until they pass,
+  "formal verification" means the randomized simulation of the same properties, not a proof.
+  Even a passing run would cover three pure functions, not the control loop or signal handling.
+* No ACSL/Frama-C specification exists; AFL++ was not run.
 
 ## Benchmarks
 
@@ -120,15 +126,17 @@ One run on a 2-CPU virtual machine, 8 s per case, baseline = the code before thi
 
 | | baseline | now |
 |---|---|---|
-| CPU share at `-l 10 / 25 / 50 / 75 / 90` | 8.1 / 24.8 / 53.1 / 74.9 / 89.6 % | 7.0 / 24.0 / 52.2 / 75.0 / 89.5 % |
-| limiter CPU, one target | 0.12 % | 0.12 % |
-| syscalls per second, one target | 215 | 88 |
-| limiter CPU, `-i` with 200 children | 4.9 % | 2.4 % |
+| CPU share at `-l 10 / 25 / 50 / 75 / 90` | 7.2 / 24.0 / 53.1 / 74.3 / 89.5 % | 7.2 / 23.2 / 52.1 / 74.3 / 89.5 % |
+| limiter CPU, one target | 0.25 % | 0.12 % |
+| syscalls per second, one target | 212 | 88 |
+| limiter CPU, `-i` with 200 children | 5.0 % | 2.4 % |
 
 Accuracy is a wash, not an improvement: both versions use the same controller and both
 under-deliver at low limits and overshoot at 50 %. The gains are overhead and the correctness
 fixes above. This is a single run on a shared VM with a 10 ms clock tick, so treat differences of
-a point or two as noise.
+a point or two as noise. An earlier run measured the baseline's single-target limiter CPU at 0.12 %,
+so that row is within run-to-run variation; the syscall and `-i` rows were stable across both runs.
+The [project page](https://denji.github.io/cpulimit/) plots these numbers.
 
 ## Known limitations
 
