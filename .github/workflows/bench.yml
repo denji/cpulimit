@@ -22,15 +22,15 @@ jobs:
           fetch-depth: 0
       - run: sudo apt-get update && sudo apt-get install -y strace
       - name: build the baseline
-        run: |
-          ref="${{ github.event.inputs.baseline || '53e5dc6' }}"
-          git worktree add ../baseline "$ref"
-          make -C ../baseline/src cpulimit CFLAGS="-O2" || make -C ../baseline/src CFLAGS="-O2"
+        id: base
+        env:
+          REF: ${{ github.event.inputs.baseline || '53e5dc6' }}
+        run: echo "bin=$(sh bench/build_ref.sh "$REF" ../baseline)" >> "$GITHUB_OUTPUT"
       - name: build the candidate
         run: make CFLAGS="-O2" all build/test/busy
       - name: compare
         run: |
-          sh bench/bench.sh ../baseline/src/cpulimit build/cpulimit build/test/busy 10 | tee bench.txt
+          sh bench/bench.sh "${{ steps.base.outputs.bin }}" build/cpulimit build/test/busy 10 | tee bench.txt
           { echo '```'; cat bench.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:

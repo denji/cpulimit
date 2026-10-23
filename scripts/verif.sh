@@ -16,7 +16,7 @@ for h in $SET; do
     case $h in
     verify_limiter) src="src/limiter.c"; unwind=3 ;;
     verify_ticks) src="src/procfs_parse.c"; unwind=3 ;;   # the 1000-iteration path is excluded by the harness under cbmc
-    verify_parse_stat) src="src/procfs_parse.c"; unwind=26 ;;   # MAXLEN 24 + 2 under cbmc
+    verify_parse_stat) src="src/procfs_parse.c"; unwind=14 ;;   # MAXLEN 12 + 2 under cbmc
     verify_parse_stat_line) src="src/procfs_parse.c"; unwind=50 ;;   # 45-byte line, strrchr and the field loop
     *) echo "unknown harness $h" >&2; exit 2 ;;
     esac

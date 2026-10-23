@@ -114,11 +114,16 @@ reachable with a real `CLK_TCK`), and the original parsed `-l` with `atoi`.
 * musl on non-x86 runs under qemu-user, which fakes parts of `/proc`; some process-name tests are
   skipped there.
 * **CBMC:** four harnesses (controller invariants, tick conversion, `stat` parser rejection paths,
-  field positions of a well-formed line). `cbmc.yml` runs each with several SAT/SMT back ends
-  (whatever the installed CBMC offers) and reports the exit status and time per pair; it is kept out
-  of the push workflows until a pair finishes. The first runs found a real defect and then timed out
-  in the SAT solver, so the bounded domains were narrowed. Even a passing run covers pure functions
-  only, not the control loop or signal handling.
+  field positions of a well-formed line), in `cbmc.yml` (manual and weekly, not on pushes).
+  **One has a verdict:** `verify_parse_stat_line` (state, ppid, utime, stime and starttime are
+  exactly fields 3, 4, 14, 15 and 22 of a 45-byte line with symbolic digits, no overflow or
+  out-of-bounds access) was verified by CBMC with its default solver in CI run 39890593464
+  (commit 75e6bbe). That is a bounded claim about one line shape, not about the parser. The
+  controller harness reported a division by infinity as a NaN source, which is a false positive
+  (finite / infinity is 0) and is excluded in the harness; the tick-conversion and short-input
+  parser harnesses did not finish building their formulas, so their bounds were narrowed (ticks
+  below 2^48, clock rate up to 2^20; inputs up to 12 bytes) and have not been re-run. The installed
+  CBMC offers no CaDiCaL option; Bitwuzla through SMT2 failed with a verification error.
 * No ACSL/Frama-C specification exists; AFL++ was not run.
 
 ## Benchmarks

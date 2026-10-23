@@ -26,6 +26,14 @@ static void one(void)
     VERIF_ASSUME(limit >= 0.0 && limit <= 64.0);          /* limit as a fraction of a CPU, <= 64 cores */
     VERIF_ASSUME(prev >= 0.0 && prev <= 1.0);             /* previous rate comes from this function */
     /* pcpu is a measurement: anything non-negative, or the negative "no sample yet" marker */
+#ifdef VERIF_CBMC
+    /* A measured share is a CPU-time difference over an interval, so it is finite (NaN stays
+     * possible: the controller must cope with it). CBMC's NaN check treats every division by an
+     * infinity as a NaN source, but finite / infinity is 0: the counterexample it found in the first
+     * run (target = 6.7e-309, pcpu = +infinity) was that false positive. The simulation keeps
+     * infinity and checks the same assertions on it. */
+    VERIF_ASSUME(!(pcpu > 1.7976931348623157e308));
+#endif
     chunk_ns = (int64_t)chunk_us * 1000;
     compute_slices(limit, pcpu, prev, chunk_us, &s);
     assert(s.work_ns + s.stop_ns == chunk_ns);                              /* L1 */

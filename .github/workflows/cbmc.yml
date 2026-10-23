@@ -24,9 +24,10 @@ jobs:
       fail-fast: false
       matrix:
         harness: [verify_limiter, verify_ticks, verify_parse_stat, verify_parse_stat_line]
-        # "default" is the solver CBMC picks itself (MiniSAT 2.2.1); the others are options of
-        # newer CBMC builds and are skipped quickly when this build does not have them
-        solver: [default, cadical, bitwuzla]
+        # "default" is the solver CBMC picks itself (MiniSAT 2.2.1); cadical is used when this CBMC
+        # build offers it (--cadical, or --sat-solver cadical) and skipped otherwise. (Bitwuzla through
+        # the SMT2 back end was tried: CBMC ended with "verification error", exit 6.)
+        solver: [default, cadical]
     steps:
       - uses: actions/checkout@v4
       - name: install cbmc
@@ -37,10 +38,16 @@ jobs:
         env:
           SOLVER: ${{ matrix.solver }}
         run: |
-          case "$SOLVER" in default) opt="" ;; *) opt="--$SOLVER" ;; esac
-          if [ -n "$opt" ] && ! cbmc --help 2>&1 | grep -q -- "$opt"; then
+          case "$SOLVER" in
+            default) opt="" ;;
+            cadical)
+              if cbmc --help 2>&1 | grep -q -- '--cadical'; then opt="--cadical"
+              elif cbmc --help 2>&1 | grep -q -- '--sat-solver'; then opt="--sat-solver cadical"
+              else opt="none"; fi ;;
+          esac
+          if [ "$opt" = none ]; then
             echo "| ${{ matrix.harness }} | $SOLVER | not offered by this cbmc | - |" >> "$GITHUB_STEP_SUMMARY"
-            echo "::notice::cbmc has no $opt option, skipped"
+            echo "::notice::this cbmc has neither --cadical nor --sat-solver: $SOLVER skipped (not a pass)"
             exit 0
           fi
           start=$(date +%s)

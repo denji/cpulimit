@@ -17,10 +17,11 @@
 #ifndef MAXLEN
 #ifdef VERIF_CBMC
 /* nested loops are unwound to the same bound, so the formula grows with its square: 48 bytes gave
- * 3M variables and 17M clauses and timed out. 24 bytes cannot hold a complete line (the shortest
- * has 45), so this harness proves the REJECTION paths: no out-of-bounds read, *out untouched.
- * The accepting path is proved by verify_parse_stat_line.c. */
-#define MAXLEN 24
+ * 3M variables and 17M clauses and 24 bytes still never finished building. 12 bytes cannot hold a
+ * complete line (the shortest has 45), so this harness proves only the REJECTION paths for short
+ * inputs: no out-of-bounds read, *out untouched. The accepting path is verify_parse_stat_line.c;
+ * longer malformed inputs are the fuzzer's and the unit tests' job. */
+#define MAXLEN 12
 #else
 #define MAXLEN 48
 #endif

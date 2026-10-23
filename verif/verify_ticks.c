@@ -13,11 +13,20 @@ static void one(void)
     long hz = nondet_long();
     int64_t got;
 #ifdef VERIF_CBMC
-    /* Above UINT64_MAX / 1000 ticks_to_ms() divides by 1000 repeated additions, a loop that makes
-     * the formula too large for the solver (the first CBMC runs timed out). That path is covered by
-     * the full-range simulation (make verif-sim) and by test/procfs_parse_test.c; the bounded proof
-     * is for every clock rate below it. */
+#ifndef VERIF_TICKS_FULL
+    /* Bounded domain for the model checker: ticks below 2^48 (89 years at 100 Hz) and clock rates up
+     * to 2^20 (real CLK_TCK values are 100 to 1000; 2^20 is generous). The upper bits are then
+     * constant, which keeps the 64-bit dividers and the 128-bit multipliers small enough for the
+     * solver: the first runs, over the full range, never finished building the formula. What this
+     * does not cover is the saturation at INT64_MAX and the 1000-iteration path for clock rates above
+     * 1.8e16: those are covered by the full-range simulation (make verif-sim) and by
+     * test/procfs_parse_test.c. Compile with -DVERIF_TICKS_FULL to try the full range. */
+    VERIF_ASSUME(ticks < ((uint64_t)1 << 48));
+    VERIF_ASSUME(hz <= (1L << 20));
+#else
+    /* above UINT64_MAX / 1000 the code loops 1000 times; unwind 3 cannot hold that */
     VERIF_ASSUME(hz <= 18446744073709551L);
+#endif
 #endif
     got = ticks_to_ms(ticks, hz);
     assert(got >= 0);

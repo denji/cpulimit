@@ -22,3 +22,10 @@ cbmc --version
 echo "solver options offered:"
 cbmc --help 2>&1 | grep -Eo -- '--(cadical|glucose|kissat|minisat2|bitwuzla|z3|cvc5|yices|boolector|smt2)\b' | sort -u | tr '\n' ' '
 echo
+# readable without opening the log: annotations are served by the checks API
+{
+    echo "cbmc: $(cbmc --version 2>&1 | head -n 1), package: $([ "$installed" -eq 1 ] && echo "release $url" || echo distribution)"
+    echo "options mentioning solvers:"
+    cbmc --help 2>&1 | grep -iE 'sat|solver|cadical|glucose|smt' | head -n 15
+} | sed -e 's/%/%25/g' | awk '{ printf "%s%%0A", $0 }' | { read -r msg; echo "::notice title=cbmc build::$msg"; }
+
