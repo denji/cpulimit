@@ -94,27 +94,16 @@ jobs:
       - run: make all
       - uses: github/codeql-action/analyze@v3
 
-  # Formal verification: the harnesses in verif/ state L1-L4 of the controller, exactness of the
-  # tick conversion and memory safety of the /proc/<pid>/stat parser for every input up to a bound.
-  # EXPERIMENTAL: no CBMC run has completed yet (the first one starved and lost the runner). One job
-  # per harness, a memory ulimit and a time limit each, so a harness that does not finish is
-  # reported on its own and is not mistaken for a proof.
-  formal-cbmc:
-    name: cbmc ${{ matrix.harness }}
+  # The harnesses in verif/ as ordinary programs: every nondeterministic input is drawn at random
+  # (with a bias to boundary values), the assertions are the properties. This is random testing of
+  # the same statements the bounded model checker gets (workflow cbmc.yml), over the full input
+  # range. It proves nothing, and it must pass on every push.
+  verif-sim:
+    timeout-minutes: 15
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
-    continue-on-error: true
-    strategy:
-      fail-fast: false
-      matrix:
-        harness: [verify_limiter, verify_ticks, verify_parse_stat, verify_parse_stat_line]
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y cbmc
-      - name: harness as a random test (checks that the harness itself is sound)
-        run: make verif-sim
-      - name: bounded model checking
-        run: bash scripts/ci_run.sh "cbmc ${{ matrix.harness }}" make verif-cbmc VERIF_ONLY=${{ matrix.harness }} CBMC_TIMEOUT=1500 CBMC_SOLVER=auto
+      - run: bash scripts/ci_run.sh "verif-sim" make verif-sim
 
   mutation:
     timeout-minutes: 30

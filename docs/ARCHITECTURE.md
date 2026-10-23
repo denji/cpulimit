@@ -113,7 +113,7 @@ before use. Keying on the start time means a recycled pid is a different target.
 | Property | Technique | Where |
 |---|---|---|
 | Parsers accept exactly the grammar | unit + property tests; libFuzzer and a standalone mutation driver, both with checked properties (not only "no crash") | `test/*_test.c`, `fuzz/` |
-| Controller invariants L1-L4, tick conversion, `/proc` parser memory safety | harnesses run as random tests (`make verif-sim`) and as bounded proofs under CBMC (`make verif-cbmc`) | `verif/` |
+| Controller invariants L1-L4, tick conversion, `/proc` parser memory safety | harnesses run as random tests on every push (`make verif-sim`) and as bounded proofs under CBMC (`make verif-cbmc`, workflow `cbmc.yml`, experimental) | `verif/` |
 | Memory safety / leaks / UB | ASan, UBSan, clang integer sanitizers, valgrind, allocation-failure injection | CI `verify` |
 | `list.c` | model-based test against an array, allocation failure | `test/list_test.c` |
 | Process table behavior | scripted iterator (deterministic) | `test/group_test.c` |

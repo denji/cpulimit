@@ -61,7 +61,12 @@ struct process {
     //the pid) to tell a process from a later one that reuses its pid. The unit is
     //platform dependent (clock ticks since boot on Linux, seconds elsewhere).
     int64_t starttime;
-    //cputime used by the process (in milliseconds)
+    //CPU time used by the process (in milliseconds). The resolution depends on the platform's
+    //source: Linux whole clock ticks (10 ms at CLK_TCK=100) from /proc/<pid>/stat, macOS
+    //nanoseconds (proc_pidinfo, mach timebase), FreeBSD microseconds (ki_runtime), Solaris and
+    //illumos nanoseconds (psinfo pr_time). A consumer only uses differences. (A nanosecond CPU
+    //clock was tried on Linux: no measurable accuracy gain in make bench, two more syscalls per
+    //cycle, so it was dropped.)
     int64_t cputime;
     //actual cpu usage estimation (value in range 0-1), -1 until measured
     double cpu_usage;

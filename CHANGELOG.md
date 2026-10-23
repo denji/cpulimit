@@ -5,6 +5,17 @@ All notable changes to this fork of cpulimit. Format follows
 [Semantic Versioning](https://semver.org/). The command-line interface and the exit statuses
 documented in `man cpulimit` are the public interface that 1.x keeps stable.
 
+## [Unreleased]
+
+### Changed
+- CBMC moved out of the push workflows into `cbmc.yml` (manual and weekly): one job per harness and
+  solver back end (default, CaDiCaL, Bitwuzla when the installed CBMC offers them), exit status and
+  time in the job summary, newest CBMC release installed by `scripts/install_cbmc.sh`. The random-test
+  harnesses (`make verif-sim`) became a required `verify` job.
+- `cputime` units and per-platform resolution documented in `src/process_iterator.h`. A nanosecond
+  CPU clock for the Linux single-target path was tried and dropped: no measurable accuracy gain in
+  `make bench`, two more system calls per cycle.
+
 ## [1.0.1] - 2026-10-22
 
 Maintenance release: one internal fix found by the bounded model checker, and verification work.

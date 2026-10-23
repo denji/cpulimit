@@ -1,0 +1,50 @@
+name: cbmc
+
+# Bounded model checking of the harnesses in verif/. EXPERIMENTAL and kept out of the push
+# workflows on purpose: no run has completed with a verdict yet (the first ones timed out in the
+# SAT solver), so a failure here is information about the solver and the bounds, not about the
+# code. Run it by hand (Actions > cbmc > Run workflow) or wait for the weekly run. Every
+# harness/solver pair is its own job and reports its exit status and time in the job summary.
+# When a pair finishes green, move it into verify.yml.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  cbmc:
+    name: ${{ matrix.harness }} / ${{ matrix.solver }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        harness: [verify_limiter, verify_ticks, verify_parse_stat, verify_parse_stat_line]
+        # "default" is the solver CBMC picks itself (MiniSAT 2.2.1); the others are options of
+        # newer CBMC builds and are skipped quickly when this build does not have them
+        solver: [default, cadical, bitwuzla]
+    steps:
+      - uses: actions/checkout@v4
+      - name: install cbmc
+        run: bash scripts/install_cbmc.sh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: bounded model checking
+        env:
+          SOLVER: ${{ matrix.solver }}
+        run: |
+          case "$SOLVER" in default) opt="" ;; *) opt="--$SOLVER" ;; esac
+          if [ -n "$opt" ] && ! cbmc --help 2>&1 | grep -q -- "$opt"; then
+            echo "| ${{ matrix.harness }} | $SOLVER | not offered by this cbmc | - |" >> "$GITHUB_STEP_SUMMARY"
+            echo "::notice::cbmc has no $opt option, skipped"
+            exit 0
+          fi
+          start=$(date +%s)
+          bash scripts/ci_run.sh "cbmc ${{ matrix.harness }} $SOLVER" \
+            make verif-cbmc VERIF_ONLY=${{ matrix.harness }} CBMC_TIMEOUT=1800 CBMC_SOLVER="$opt" && rc=0 || rc=$?
+          echo "| ${{ matrix.harness }} | $SOLVER | exit $rc (0 = verified, 10 = property violated, 124 = timeout) | $(( $(date +%s) - start )) s |" >> "$GITHUB_STEP_SUMMARY"
+          exit "$rc"

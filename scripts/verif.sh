@@ -36,7 +36,8 @@ for h in $SET; do
         # by a signal prints nothing (the first conclusive CI run ended silently mid-solve).
         if [ -n "${CBMC_MEM_KB:-}" ]; then ulimit -v "$CBMC_MEM_KB" 2>/dev/null || true; fi
         # CBMC_SOLVER: empty = CBMC's default (MiniSAT 2.2.1, 2010); "auto" = --cadical when this
-        # cbmc lists it, falling back to the default if the option is refused; or any cbmc option.
+        # cbmc lists it, falling back to the default if the option is refused; or any cbmc option
+        # (e.g. --cadical, --bitwuzla), used as given, without a fallback.
         solver=${CBMC_SOLVER:-}
         if [ "$solver" = auto ]; then
             solver=; cbmc --help 2>&1 | grep -q -- '--cadical' && solver=--cadical
@@ -51,7 +52,7 @@ for h in $SET; do
                 --pointer-overflow-check --undefined-shift-check --float-overflow-check --nan-check \
                 --object-bits 12 && rc=0 || rc=$?
             # exit 1 / 6 = the option or the input was refused: retry once with the default solver
-            if [ -n "$solver" ] && [ "$attempt" -eq 1 ] && { [ "$rc" -eq 1 ] || [ "$rc" -eq 6 ]; }; then
+            if [ "${CBMC_SOLVER:-}" = auto ] && [ -n "$solver" ] && [ "$attempt" -eq 1 ] && { [ "$rc" -eq 1 ] || [ "$rc" -eq 6 ]; }; then
                 echo "cbmc refused '$solver' (exit $rc), retrying with the default solver"
                 solver=; attempt=2; continue
             fi

@@ -97,7 +97,7 @@ author's Linux x86_64 machine while developing this version; the last commit che
 |---|---|---|
 | `make check` | 10 suites: iterator, utils, controller, parser, process table, list, CLI, lock, CLI end-to-end, 55 integration checks with real processes | passing: gcc and clang `-O2 -Werror`, ASan+UBSan, clang integer sanitizers |
 | Fuzzing (`make fuzz-standalone`, `make fuzz-libfuzzer`) | `/proc/<pid>/stat` parser and CLI parser with checked properties | standalone driver: 300k+ mutations per target clean here; libFuzzer jobs pass in CI. The harness found one real bug (below) |
-| `make verif-sim`, `make verif-cbmc` | invariants of the controller, exactness of tick conversion, parser memory safety | simulation passes and found one real bug. **The CBMC jobs currently fail** and are experimental, so nothing is claimed proved (see below) |
+| `make verif-sim`, `make verif-cbmc` | invariants of the controller, exactness of tick conversion, parser memory safety | simulation passes on every push and found one real bug. CBMC runs in its own workflow (`cbmc.yml`, manual and weekly) and is experimental: it found one real defect (fixed in 1.0.1) but has not yet produced a verdict for the other harnesses, so nothing is claimed proved (see below) |
 | `scripts/mutation.sh` | 20 re-introduced defects | 20/20 detected after two new tests |
 | `scripts/coverage.sh` | gcov line/branch coverage, daemon children included | 89.2% lines, 78.6% branches (gate: 85% lines) |
 | `make stress` | 15 s fork/exit churn under `-i`, 300 children, no leaks, nothing left stopped, valgrind clean | passing |
@@ -113,10 +113,12 @@ reachable with a real `CLK_TCK`), and the original parsed `-l` with `atoi`.
 * macOS, FreeBSD, Solaris on real hardware; Solaris builds at all; real syslog delivery.
 * musl on non-x86 runs under qemu-user, which fakes parts of `/proc`; some process-name tests are
   skipped there.
-* **CBMC:** the three harnesses (controller invariants, tick conversion, `stat` parser) run in CI
-  but the jobs fail: CBMC ends without a verdict and the cause is not yet known. Until they pass,
-  "formal verification" means the randomized simulation of the same properties, not a proof.
-  Even a passing run would cover three pure functions, not the control loop or signal handling.
+* **CBMC:** four harnesses (controller invariants, tick conversion, `stat` parser rejection paths,
+  field positions of a well-formed line). `cbmc.yml` runs each with several SAT/SMT back ends
+  (whatever the installed CBMC offers) and reports the exit status and time per pair; it is kept out
+  of the push workflows until a pair finishes. The first runs found a real defect and then timed out
+  in the SAT solver, so the bounded domains were narrowed. Even a passing run covers pure functions
+  only, not the control loop or signal handling.
 * No ACSL/Frama-C specification exists; AFL++ was not run.
 
 ## Benchmarks
