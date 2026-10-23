@@ -98,8 +98,8 @@ author's Linux x86_64 machine while developing this version; the last commit che
 | `make check` | 10 suites: iterator, utils, controller, parser, process table, list, CLI, lock, CLI end-to-end, 55 integration checks with real processes | passing: gcc and clang `-O2 -Werror`, ASan+UBSan, clang integer sanitizers |
 | Fuzzing (`make fuzz-standalone`, `make fuzz-libfuzzer`) | `/proc/<pid>/stat` parser and CLI parser with checked properties | standalone driver: 300k+ mutations per target clean here; libFuzzer jobs pass in CI. The harness found one real bug (below) |
 | `make verif-sim`, `make verif-cbmc` | invariants of the controller, exactness of tick conversion, parser memory safety | simulation passes on every push and found one real bug. CBMC runs in its own workflow (`cbmc.yml`, manual and weekly) and is experimental: it found one real defect (fixed in 1.0.1) but has not yet produced a verdict for the other harnesses, so nothing is claimed proved (see below) |
-| `scripts/mutation.sh` | 20 re-introduced defects | 20/20 detected after two new tests |
-| `scripts/coverage.sh` | gcov line/branch coverage, daemon children included | 89.2% lines, 78.6% branches (gate: 85% lines) |
+| `tools/mutation.sh` | 20 re-introduced defects | 20/20 detected after two new tests |
+| `tools/coverage.sh` | gcov line/branch coverage, daemon children included | 89.2% lines, 78.6% branches (gate: 85% lines) |
 | `make stress` | 15 s fork/exit churn under `-i`, 300 children, no leaks, nothing left stopped, valgrind clean | passing |
 | `make analyze` | `gcc -fanalyzer`, clang-tidy | clean |
 | cppcheck, CodeQL | | pass in CI |
@@ -128,7 +128,7 @@ reachable with a real `CLK_TCK`), and the original parsed `-l` with `atoi`.
 
 ## Benchmarks
 
-`make bench BASELINE=/path/to/old/cpulimit` compares two binaries back to back (`bench/bench.sh`).
+`make bench BASELINE=/path/to/old/cpulimit` compares two binaries back to back (`tools/bench.sh`).
 One run on a 2-CPU virtual machine, 8 s per case, baseline = the code before this work:
 
 | | baseline | now |

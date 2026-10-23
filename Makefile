@@ -38,10 +38,21 @@ ifeq ($(UNAME),FreeBSD)
 LDLIBS_PLAT += -lkvm
 endif
 
-LIB_OBJS   := $(addprefix $(BUILD)/,list.o process_iterator.o process_group.o util.o limiter.o procfs_parse.o)
+# Source layout (see docs/ARCHITECTURE.md):
+#   src/core      controller, process table, list, allocation seam   (portable, no I/O)
+#   src/platform  process iterator: one directory per OS, picked by the preprocessor in iterator.c;
+#                 procfs_parse is portable C, built everywhere so it is tested everywhere
+#   src/runtime   daemon, lock file, log                              (POSIX)
+#   src/cli       command-line parsing (a pure function)
+#   src/util      small helpers
+# Objects keep the directory structure under $(BUILD).
+CORE_SRC   := core/list.c core/process_group.c core/limiter.c
+PLAT_SRC   := platform/iterator.c platform/procfs_parse.c
+UTIL_SRC   := util/util.c
+LIB_OBJS   := $(patsubst %.c,$(BUILD)/%.o,$(CORE_SRC) $(PLAT_SRC) $(UTIL_SRC))
 # modules used by the executable only (they pull in syslog, fork, fcntl and the CLI)
-APP_OBJS   := $(addprefix $(BUILD)/,cli.o lock.o daemon.o log.o)
-MAIN_OBJ   := $(BUILD)/cpulimit.o
+APP_OBJS   := $(patsubst %.c,$(BUILD)/%.o,cli/cli.c runtime/lock.c runtime/daemon.c runtime/log.c)
+MAIN_OBJ   := $(BUILD)/main.o
 UNIT_TESTS := process_iterator_test util_test limiter_test procfs_parse_test group_test list_test cli_parse_test lock_test
 TEST_BINS  := $(addprefix $(BUILD)/test/,$(UNIT_TESTS) busy spawn)
 
@@ -58,32 +69,33 @@ $(BUILD)/.flags: FORCE
 	@if cmp -s $@.new $@; then rm -f $@.new; else mv -f $@.new $@; fi
 
 $(BUILD)/%.o: $(SRCDIR)/%.c $(BUILD)/.flags
+	@mkdir -p $(@D)
 	$(CC) $(ALL_CPPFLAGS) -MMD -MP $(ALL_CFLAGS) -c -o $@ $<
 
 $(BIN): $(MAIN_OBJ) $(APP_OBJS) $(LIB_OBJS)
 	$(CC) -o $@ $(MAIN_OBJ) $(APP_OBJS) $(LIB_OBJS) $(LDFLAGS) $(LDLIBS_PLAT)
 
-$(BUILD)/test/%_test: $(TESTDIR)/%_test.c $(APP_OBJS) $(LIB_OBJS) $(BUILD)/.flags
+$(BUILD)/test/%_test: $(TESTDIR)/unit/%_test.c $(APP_OBJS) $(LIB_OBJS) $(BUILD)/.flags
 	$(CC) $(ALL_CPPFLAGS) -I$(TESTDIR) -UNDEBUG -MMD -MP $(ALL_CFLAGS) -o $@ $< $(APP_OBJS) $(LIB_OBJS) $(LDFLAGS) $(LDLIBS_PLAT)
 
 # The group tests run process_group.c against a scripted iterator and an allocator that can
 # fail on demand, so list.c and process_group.c are rebuilt here with the allocation seam on.
-GT_DEFS := -DCL_ALLOC_HEADER='"fault_alloc.h"' -I$(TESTDIR)
+GT_DEFS := -DCL_ALLOC_HEADER='"support/fault_alloc.h"' -I$(TESTDIR)
 
-$(BUILD)/test/gt_%.o: $(SRCDIR)/%.c $(BUILD)/.flags
+$(BUILD)/test/gt_%.o: $(SRCDIR)/core/%.c $(BUILD)/.flags
 	$(CC) $(ALL_CPPFLAGS) $(GT_DEFS) -MMD -MP $(ALL_CFLAGS) -c -o $@ $<
 
-$(BUILD)/test/group_test: $(TESTDIR)/group_test.c $(TESTDIR)/fake_iterator.c $(TESTDIR)/fault_alloc.c \
-        $(BUILD)/test/gt_list.o $(BUILD)/test/gt_process_group.o $(BUILD)/util.o $(BUILD)/.flags
+$(BUILD)/test/group_test: $(TESTDIR)/unit/group_test.c $(TESTDIR)/support/fake_iterator.c $(TESTDIR)/support/fault_alloc.c \
+        $(BUILD)/test/gt_list.o $(BUILD)/test/gt_process_group.o $(BUILD)/util/util.o $(BUILD)/.flags
 	$(CC) $(ALL_CPPFLAGS) -I$(TESTDIR) -UNDEBUG $(ALL_CFLAGS) -o $@ $(filter %.c %.o,$^) $(LDFLAGS)
 
-$(BUILD)/test/list_test: $(TESTDIR)/list_test.c $(TESTDIR)/fault_alloc.c $(BUILD)/test/gt_list.o $(BUILD)/.flags
+$(BUILD)/test/list_test: $(TESTDIR)/unit/list_test.c $(TESTDIR)/support/fault_alloc.c $(BUILD)/test/gt_list.o $(BUILD)/.flags
 	$(CC) $(ALL_CPPFLAGS) -I$(TESTDIR) -UNDEBUG $(ALL_CFLAGS) -o $@ $(filter %.c %.o,$^) $(LDFLAGS)
 
-$(BUILD)/test/busy: $(TESTDIR)/busy.c $(BUILD)/.flags
+$(BUILD)/test/busy: $(TESTDIR)/support/busy.c $(BUILD)/.flags
 	$(CC) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -o $@ $< $(LDFLAGS) -lpthread
 
-$(BUILD)/test/spawn: $(TESTDIR)/spawn.c $(BUILD)/.flags
+$(BUILD)/test/spawn: $(TESTDIR)/support/spawn.c $(BUILD)/.flags
 	$(CC) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -o $@ $< $(LDFLAGS)
 
 # The man page is hand-written (man/cpulimit.1); `make man` only checks that it formats.
@@ -138,8 +150,8 @@ FORCE:
 FUZZ_ITERATIONS ?= 200000
 FUZZ_SEED       ?= 1
 FUZZ_SAN        ?= -fsanitize=address,undefined -fno-sanitize-recover=undefined
-FUZZ_SRC_procfs := $(SRCDIR)/procfs_parse.c
-FUZZ_SRC_cli    := $(SRCDIR)/cli.c $(SRCDIR)/util.c
+FUZZ_SRC_procfs := $(SRCDIR)/platform/procfs_parse.c
+FUZZ_SRC_cli    := $(SRCDIR)/cli/cli.c $(SRCDIR)/util/util.c
 
 fuzz-standalone:
 	@mkdir -p $(BUILD)/fuzz
@@ -159,18 +171,19 @@ fuzz-libfuzzer:
 
 # ---- load, memory and benchmark ---------------------------------------------------------------
 stress: all $(BUILD)/test/busy
-	BUILD=$(BUILD) sh $(TESTDIR)/stress_test.sh
+	BUILD=$(BUILD) sh $(TESTDIR)/integration/stress_test.sh
 
 # BASELINE=/path/to/other/cpulimit  make bench
 bench: all $(BUILD)/test/busy
 	@test -n "$(BASELINE)" || { echo "bench: set BASELINE=<path to the binary to compare against>" >&2; exit 1; }
-	sh bench/bench.sh $(BASELINE) $(BIN) $(BUILD)/test/busy $(BENCH_SECONDS)
+	sh tools/bench.sh $(BASELINE) $(BIN) $(BUILD)/test/busy $(BENCH_SECONDS)
 
 BENCH_SECONDS ?= 8
 
 # ---- static analysis and verification -------------------------------------------------------
 # Platform iterators other than the one this host builds are not analysable here.
-ANALYZE_SRCS := $(filter-out $(SRCDIR)/process_iterator_%.c,$(wildcard $(SRCDIR)/*.c))
+# (src/platform/<os>/iterator.c are #included by src/platform/iterator.c, never compiled alone)
+ANALYZE_SRCS := $(filter-out $(SRCDIR)/platform/%/iterator.c,$(shell find $(SRCDIR) -name '*.c' | sort))
 
 # gcc -fanalyzer is a hard gate; clang-tidy runs when installed (config in .clang-tidy).
 analyze:
@@ -182,15 +195,15 @@ analyze:
 
 # Properties of the pure functions: random testing here, proof for a bound under CBMC.
 verif-sim:
-	CC=$(CC) BUILD=$(BUILD) sh scripts/verif.sh sim
+	CC=$(CC) BUILD=$(BUILD) sh tools/verif.sh sim
 
 verif-cbmc:
-	BUILD=$(BUILD) sh scripts/verif.sh cbmc
+	BUILD=$(BUILD) sh tools/verif.sh cbmc
 
 # ---- coverage ------------------------------------------------------------------------------
 # Builds with gcov instrumentation in its own directory, runs the whole test suite and prints
-# per-file line and branch coverage (scripts/coverage.sh).
+# per-file line and branch coverage (tools/coverage.sh).
 coverage:
-	CC=$(CC) BUILD=$(BUILD)/cov sh scripts/coverage.sh
+	CC=$(CC) BUILD=$(BUILD)/cov sh tools/coverage.sh
 
--include $(wildcard $(BUILD)/*.d $(BUILD)/test/*.d)
+-include $(patsubst %.o,%.d,$(LIB_OBJS) $(APP_OBJS) $(MAIN_OBJ)) $(wildcard $(BUILD)/test/*.d)

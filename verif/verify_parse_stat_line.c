@@ -11,7 +11,7 @@
  * Numbers longer than one digit and malformed lines are the business of verify_parse_stat.c, the
  * fuzzer and the unit tests; this harness is about field positions. */
 #include "harness.h"
-#include "procfs_parse.h"
+#include "platform/procfs_parse.h"
 
 #ifdef VERIF_CBMC
 int main(void)

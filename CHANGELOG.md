@@ -9,18 +9,24 @@ documented in `man cpulimit` are the public interface that 1.x keeps stable.
 
 ### Fixed
 - `bench` workflow: the baseline build assumed the original `src/Makefile` layout and failed for any
-  modernized ref. `bench/build_ref.sh REF DIR` builds either layout and prints the binary path.
+  modernized ref. `tools/build_ref.sh REF DIR` builds either layout and prints the binary path.
 - CBMC harnesses: the controller harness excludes an infinite measurement under CBMC (CBMC's NaN
   check flags every division by infinity; finite / infinity is 0), the tick-conversion and
   short-input parser harnesses use smaller bounded domains (the full-range formulas never finished
   building). `verify_parse_stat_line` has been verified once by CBMC (run 39890593464).
 
 ### Changed
+- Source tree reorganized by role, no behavior change (same binary logic, same tests, coverage
+  89.2% / 78.6% as before): `src/{cli,core,runtime,platform,util}/`, one directory per platform
+  under `src/platform/`, tests split into `test/{unit,integration,support}/`, `scripts/` and
+  `bench/` merged into `tools/`. `src/cpulimit` is still built for scripts that expect it.
+- `compute_slices`: the rate is `target / pcpu` (or 1), which cannot produce a NaN from an infinite
+  measurement; new limiter tests and the mutation suite (20/20) cover it.
 - CBMC moved out of the push workflows into `cbmc.yml` (manual and weekly): one job per harness and
   solver back end (default, CaDiCaL when the installed CBMC offers it; Bitwuzla via SMT2 was tried and failed), exit status and
-  time in the job summary, newest CBMC release installed by `scripts/install_cbmc.sh`. The random-test
+  time in the job summary, newest CBMC release installed by `tools/install_cbmc.sh`. The random-test
   harnesses (`make verif-sim`) became a required `verify` job.
-- `cputime` units and per-platform resolution documented in `src/process_iterator.h`. A nanosecond
+- `cputime` units and per-platform resolution documented in `src/platform/iterator.h`. A nanosecond
   CPU clock for the Linux single-target path was tried and dropped: no measurable accuracy gain in
   `make bench`, two more system calls per cycle.
 

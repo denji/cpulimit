@@ -31,7 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: install cbmc
-        run: bash scripts/install_cbmc.sh
+        run: bash tools/install_cbmc.sh
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: bounded model checking
@@ -51,7 +51,7 @@ jobs:
             exit 0
           fi
           start=$(date +%s)
-          bash scripts/ci_run.sh "cbmc ${{ matrix.harness }} $SOLVER" \
+          bash tools/ci_run.sh "cbmc ${{ matrix.harness }} $SOLVER" \
             make verif-cbmc VERIF_ONLY=${{ matrix.harness }} CBMC_TIMEOUT=1800 CBMC_SOLVER="$opt" && rc=0 || rc=$?
           echo "| ${{ matrix.harness }} | $SOLVER | exit $rc (0 = verified, 10 = property violated, 124 = timeout) | $(( $(date +%s) - start )) s |" >> "$GITHUB_STEP_SUMMARY"
           exit "$rc"

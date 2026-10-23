@@ -1,7 +1,7 @@
 /* ticks_to_ms(): exact for every input, saturating at INT64_MAX, 0 for an unusable rate.
  * The specification is the one-line 128-bit formula; CBMC supports __int128. */
 #include "harness.h"
-#include "procfs_parse.h"
+#include "platform/procfs_parse.h"
 
 #ifdef VERIF_CBMC
 int main(void)
@@ -20,7 +20,7 @@ static void one(void)
      * solver: the first runs, over the full range, never finished building the formula. What this
      * does not cover is the saturation at INT64_MAX and the 1000-iteration path for clock rates above
      * 1.8e16: those are covered by the full-range simulation (make verif-sim) and by
-     * test/procfs_parse_test.c. Compile with -DVERIF_TICKS_FULL to try the full range. */
+     * test/unit/procfs_parse_test.c. Compile with -DVERIF_TICKS_FULL to try the full range. */
     VERIF_ASSUME(ticks < ((uint64_t)1 << 48));
     VERIF_ASSUME(hz <= (1L << 20));
 #else

@@ -48,7 +48,7 @@ jobs:
         run: |
           make CFLAGS="-O1 -g" $(for t in process_iterator util limiter procfs_parse group list cli_parse lock; do printf 'build/test/%s_test ' $t; done)
           for t in process_iterator util limiter procfs_parse group list cli_parse lock; do
-            bash scripts/ci_run.sh "valgrind $t" valgrind -q --leak-check=full --error-exitcode=99 build/test/${t}_test
+            bash tools/ci_run.sh "valgrind $t" valgrind -q --leak-check=full --error-exitcode=99 build/test/${t}_test
           done
       - name: stress test (churn, 300 children, valgrind attach and command mode)
         run: make stress
@@ -71,9 +71,9 @@ jobs:
         run: make analyze
       - name: cppcheck
         run: |
-          bash scripts/ci_run.sh cppcheck cppcheck --error-exitcode=1 --inline-suppr --enable=warning,portability,performance \
+          bash tools/ci_run.sh cppcheck cppcheck --error-exitcode=1 --inline-suppr --enable=warning,portability,performance \
             --std=c99 --suppress=missingIncludeSystem -I src \
-            $(ls src/*.c | grep -v 'process_iterator_\(apple\|freebsd\|solaris\)')
+            $(find src -name '*.c' ! -path 'src/platform/macos/*' ! -path 'src/platform/freebsd/*' ! -path 'src/platform/solaris/*')
       - name: scan-build
         run: |
           make clean
@@ -103,14 +103,14 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - run: bash scripts/ci_run.sh "verif-sim" make verif-sim
+      - run: bash tools/ci_run.sh "verif-sim" make verif-sim
 
   mutation:
     timeout-minutes: 30
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - run: sh scripts/mutation.sh
+      - run: sh tools/mutation.sh
 
   coverage:
     timeout-minutes: 30

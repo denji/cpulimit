@@ -34,7 +34,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build and test
         run: |
-          bash scripts/ci_run.sh "build+test" make CC=${{ matrix.cc }} WERROR=1 CFLAGS="${{ matrix.opt }} -g" check
+          bash tools/ci_run.sh "build+test" make CC=${{ matrix.cc }} WERROR=1 CFLAGS="${{ matrix.opt }} -g" check
 
   # C standard / feature-test-macro coverage: the code must not rely on gnu extensions silently.
   standards:
@@ -47,7 +47,7 @@ jobs:
         std: [gnu99, gnu11, gnu17, gnu2x]
     steps:
       - uses: actions/checkout@v4
-      - run: bash scripts/ci_run.sh "standards" make CC=gcc WERROR=1 CFLAGS="-O2 -std=${{ matrix.std }} -pedantic-errors -Wno-error=pedantic" check
+      - run: bash tools/ci_run.sh "standards" make CC=gcc WERROR=1 CFLAGS="-O2 -std=${{ matrix.std }} -pedantic-errors -Wno-error=pedantic" check
 
   # musl libc (Alpine) on the architectures Alpine publishes, via qemu user emulation.
   alpine:
@@ -63,7 +63,7 @@ jobs:
       - uses: docker/setup-qemu-action@v3
       - name: Build and test inside Alpine
         run: |
-          bash scripts/ci_run.sh "alpine ${{ matrix.platform }}" docker run --rm --platform ${{ matrix.platform }} -v "$PWD:/src" -w /src alpine:3.20 sh -ec '
+          bash tools/ci_run.sh "alpine ${{ matrix.platform }}" docker run --rm --platform ${{ matrix.platform }} -v "$PWD:/src" -w /src alpine:3.20 sh -ec '
             apk add --no-cache build-base make procps coreutils bash
             make WERROR=1 CFLAGS="-O2 -g" check'
 
@@ -84,9 +84,9 @@ jobs:
         os: [macos-14, macos-15]
     steps:
       - uses: actions/checkout@v4
-      - run: bash scripts/ci_run.sh "macos build" make WERROR=1 CFLAGS="-O2 -g" all
+      - run: bash tools/ci_run.sh "macos build" make WERROR=1 CFLAGS="-O2 -g" all
       - name: Unit tests
-        run: bash scripts/ci_run.sh "macos tests" make CFLAGS="-O2 -g" check SKIP_INTEGRATION=1
+        run: bash tools/ci_run.sh "macos tests" make CFLAGS="-O2 -g" check SKIP_INTEGRATION=1
 
   freebsd:
     timeout-minutes: 30
@@ -127,7 +127,7 @@ jobs:
       - run: |
           # mandoc is a lint, not a requirement: without it `make man` falls back to groff or skips
           sudo apt-get update && sudo apt-get install -y mandoc || echo "mandoc not installed"
-          bash scripts/ci_run.sh man make man
+          bash tools/ci_run.sh man make man
           make install DESTDIR="$PWD/stage" PREFIX=/usr
           test -x stage/usr/bin/cpulimit && test -f stage/usr/share/man/man1/cpulimit.1
           make uninstall DESTDIR="$PWD/stage" PREFIX=/usr

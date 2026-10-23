@@ -7,8 +7,8 @@
  * plus: a measured usage at or below the target never lowers the duty cycle below the previous one
  * (the controller cannot get stuck stopping an idle process). */
 #include "harness.h"
-#include "limiter.h"
-#include "util.h"
+#include "core/limiter.h"
+#include "util/util.h"
 
 #ifdef VERIF_CBMC
 int main(void)

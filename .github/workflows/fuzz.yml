@@ -41,7 +41,7 @@ jobs:
           esac
           mkdir -p corpus-${{ matrix.target }}
           secs=${{ github.event.inputs.seconds || (github.event_name == 'schedule' && '1200') || '60' }}
-          bash scripts/ci_run.sh "${{ matrix.target }}" build/fuzz/${{ matrix.target }} -max_total_time=$secs -timeout=5 -rss_limit_mb=1024 \
+          bash tools/ci_run.sh "${{ matrix.target }}" build/fuzz/${{ matrix.target }} -max_total_time=$secs -timeout=5 -rss_limit_mb=1024 \
             -print_final_stats=1 -artifact_prefix=crash- corpus-${{ matrix.target }} $seeds
       - uses: actions/upload-artifact@v4
         if: failure()

@@ -12,7 +12,7 @@
  * "1 (x) S 1 0 ... " (fields 1..22 need 44+ bytes); the bounded proof therefore uses the
  * STATIC_PREFIX variant below for the deep fields and the free variant for the shallow ones. */
 #include "harness.h"
-#include "procfs_parse.h"
+#include "platform/procfs_parse.h"
 
 #ifndef MAXLEN
 #ifdef VERIF_CBMC

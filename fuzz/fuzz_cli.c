@@ -15,7 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "cli.h"
+#include "cli/cli.h"
 
 #define FAIL(msg) do { fprintf(stderr, "fuzz_cli: %s (line %d)\n", msg, __LINE__); abort(); } while (0)
 #define MAX_WORDS 32

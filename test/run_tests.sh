@@ -37,12 +37,12 @@ run group_test "$BUILD/test/group_test"
 run list_test "$BUILD/test/list_test"
 run cli_parse_test "$BUILD/test/cli_parse_test"
 run lock_test "$BUILD/test/lock_test"
-run cli_test env BUILD="$BUILD" sh "$dir/cli_test.sh"
-run version_test env BUILD="$BUILD" sh "$dir/version_test.sh"
+run cli_test env BUILD="$BUILD" sh "$dir/integration/cli_test.sh"
+run version_test env BUILD="$BUILD" sh "$dir/integration/version_test.sh"
 if [ -n "${SKIP_INTEGRATION:-}" ]; then
     printf 'SKIP  integration_test (SKIP_INTEGRATION set)\n'
 else
-    run integration_test env BUILD="$BUILD" sh "$dir/integration_test.sh"
+    run integration_test env BUILD="$BUILD" sh "$dir/integration/integration_test.sh"
 fi
 
 printf '\n%d test(s), %d failed\n' "$total" "$failed"

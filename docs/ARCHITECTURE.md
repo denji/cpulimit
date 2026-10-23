@@ -13,22 +13,26 @@ adjusts the work fraction from the CPU time the targets really used.
 ## 2. Modules and dependencies
 
 ```
-cpulimit.c  (main, control loop, signals)
-  ├─ cli.c            argv -> struct cli_config     pure, no exit(), no globals
-  ├─ limiter.c        controller arithmetic         pure, no I/O
-  ├─ process_group.c  per-target process table      depends on the iterator + alloc seam
-  │    └─ process_iterator_<os>.c   one file per platform, selected in process_iterator.c
-  │         └─ procfs_parse.c       /proc/<pid>/stat parser   pure, no allocation
-  ├─ lock.c           one limiter per target        fcntl record lock
-  ├─ daemon.c         detach from the terminal
-  ├─ log.c            stdout/stderr and syslog
-  ├─ util.c           strict number parsing, monotonic time, interruptible wait
-  ├─ list.c           intrusive list used by the table
-  └─ alloc.h          allocation seam (tests inject failures)
+src/main.c  (main, control loop, signals)
+  ├─ cli/cli.c               argv -> struct cli_config     pure, no exit(), no globals
+  ├─ core/limiter.c          controller arithmetic         pure, no I/O
+  ├─ core/process_group.c    per-target process table      depends on the iterator + alloc seam
+  │    └─ platform/iterator.c  selects one of platform/{linux,macos,freebsd,solaris}/iterator.c
+  │         └─ platform/procfs_parse.c   /proc/<pid>/stat parser   pure, no allocation
+  ├─ runtime/lock.c          one limiter per target        fcntl record lock
+  ├─ runtime/daemon.c        detach from the terminal
+  ├─ runtime/log.c           stdout/stderr and syslog
+  ├─ util/util.c             strict number parsing, monotonic time, interruptible wait
+  ├─ core/list.c             intrusive list used by the table
+  └─ core/alloc.h            allocation seam (tests inject failures)
+
+Adding a platform is one new file, `src/platform/<os>/iterator.c`, plus a branch in
+`src/platform/iterator.c`; nothing else includes platform code. OpenBSD, NetBSD and DragonFly have
+no iterator yet and are not built.
 ```
 
 Rules: modules marked *pure* never call `exit()`, never touch global state and
-never allocate. Only `cpulimit.c` calls `exit()`. Only `process_iterator_*.c`
+never allocate. Only `src/main.c` calls `exit()`. Only `src/platform/*/iterator.c`
 know about the operating system's process interface.
 
 ## 3. Process model
@@ -99,7 +103,7 @@ the **last** `)`. No `strtok`, `sscanf` or `strto*`; digits are accumulated with
 an explicit overflow check. Parser input is untrusted (any local user chooses
 process names), so it is fuzzed.
 
-## 7. One limiter per target (`lock.c`)
+## 7. One limiter per target (`runtime/lock.c`)
 
 Two limiters on one target fight each other (each one's `SIGCONT` undoes the
 other's `SIGSTOP`). A limiter takes an exclusive `fcntl` record lock on
@@ -115,14 +119,14 @@ before use. Keying on the start time means a recycled pid is a different target.
 | Parsers accept exactly the grammar | unit + property tests; libFuzzer and a standalone mutation driver, both with checked properties (not only "no crash") | `test/*_test.c`, `fuzz/` |
 | Controller invariants L1-L4, tick conversion, `/proc` parser memory safety | harnesses run as random tests on every push (`make verif-sim`) and as bounded proofs under CBMC (`make verif-cbmc`, workflow `cbmc.yml`, experimental) | `verif/` |
 | Memory safety / leaks / UB | ASan, UBSan, clang integer sanitizers, valgrind, allocation-failure injection | CI `verify` |
-| `list.c` | model-based test against an array, allocation failure | `test/list_test.c` |
-| Process table behavior | scripted iterator (deterministic) | `test/group_test.c` |
-| Limiting accuracy, signal handling, S1 | integration tests with real processes | `test/integration_test.sh` |
-| Fixed defects stay fixed | 20 mutants, each must fail a unit test | `scripts/mutation.sh` |
-| Load, leaks over time | fork/exit churn under `-i`, 300 children, RSS flat, valgrind | `test/stress_test.sh` |
-| Test adequacy | line and branch coverage by gcov, including daemon children | `scripts/coverage.sh` |
+| `list.c` | model-based test against an array, allocation failure | `test/unit/list_test.c` |
+| Process table behavior | scripted iterator (deterministic) | `test/unit/group_test.c` |
+| Limiting accuracy, signal handling, S1 | integration tests with real processes | `test/integration/integration_test.sh` |
+| Fixed defects stay fixed | 20 mutants, each must fail a unit test | `tools/mutation.sh` |
+| Load, leaks over time | fork/exit churn under `-i`, 300 children, RSS flat, valgrind | `test/integration/stress_test.sh` |
+| Test adequacy | line and branch coverage by gcov, including daemon children | `tools/coverage.sh` |
 | Static analysis | `gcc -fanalyzer` (must be silent), clang-tidy, cppcheck, scan-build, CodeQL | `make analyze`, CI |
-| Performance | accuracy, limiter CPU, syscalls/s, `-i` scaling against a baseline binary | `bench/bench.sh` |
+| Performance | accuracy, limiter CPU, syscalls/s, `-i` scaling against a baseline binary | `tools/bench.sh` |
 | Portability | CI matrix: OS x compiler x libc x architecture | `.github/workflows/` |
 
 Limits of this plan, stated up front:
@@ -132,7 +136,7 @@ Limits of this plan, stated up front:
   mutants; CBMC itself had not been run when this was written.
 * The macOS, FreeBSD and Solaris iterators were adapted to the shared interface without being
   compiled by the author. CI builds them but those jobs do not gate until they have passed once.
-* Unreachable defensive clamps in `limiter.c` (lines that no input can reach) are not covered by
+* Unreachable defensive clamps in `core/limiter.c` (lines that no input can reach) are not covered by
   tests; the CBMC harness is what shows they are unreachable.
 * `SIGKILL` or an OOM kill of cpulimit during a stop slice leaves the target stopped, and the
   pid can be recycled between the table update and the signal (one cycle). Neither can be fixed

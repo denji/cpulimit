@@ -12,7 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "procfs_parse.h"
+#include "platform/procfs_parse.h"
 
 #define FAIL(msg) do { fprintf(stderr, "fuzz_procfs_parse: %s (line %d)\n", msg, __LINE__); abort(); } while (0)
 

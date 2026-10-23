@@ -10,7 +10,7 @@
  *     sample and assert() is a plain assert. That is random testing of the SAME property: it
  *     finds a violated property and shows the harness itself is sound, it proves nothing.
  *
- * The mode is chosen by VERIF_CBMC, which scripts/verif.sh passes to cbmc with -D. (CBMC does not
+ * The mode is chosen by VERIF_CBMC, which tools/verif.sh passes to cbmc with -D. (CBMC does not
  * reliably predefine a macro of its own for this, and a harness that silently compiled the PRNG
  * branch under cbmc would "prove" a single fixed pseudo-random run.)
  *
