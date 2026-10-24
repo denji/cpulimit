@@ -127,8 +127,8 @@ jobs:
           release: ${{ matrix.release }}
           prepare: pkg_add gmake
           run: |
-            gmake WERROR=1 CFLAGS="-O2 -g" all
-            gmake CFLAGS="-O2 -g" check SKIP_INTEGRATION=1
+            sh tools/ci_run.sh "openbsd build ${{ matrix.release }}" gmake WERROR=1 CFLAGS="-O2 -g" all
+            sh tools/ci_run.sh "openbsd tests ${{ matrix.release }}" gmake CFLAGS="-O2 -g" check SKIP_INTEGRATION=1
 
   # Real timing: one job, one compiler, nothing else running, so the numbers mean something.
   timing:
