@@ -22,7 +22,7 @@ reachable with a real `CLK_TCK`), and the original parsed `-l` with `atoi`.
 
 ## Not verified
 
-* macOS, FreeBSD and Solaris on real hardware. macOS and OpenBSD are built and unit-tested in CI, FreeBSD is only built, Solaris is not built anywhere. Real syslog delivery.
+* macOS, FreeBSD and Solaris on real hardware. macOS and OpenBSD are built and unit-tested in CI, FreeBSD is only built, Solaris has never been compiled (the `vm` workflow is the first attempt). Real syslog delivery.
 * musl on non-x86 runs under qemu-user, which fakes parts of `/proc`; some process-name tests are
   skipped there.
 * **CBMC:** four harnesses (controller invariants, tick conversion, `stat` parser rejection paths,

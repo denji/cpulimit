@@ -1,0 +1,55 @@
+# Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
+# SPDX-License-Identifier: GPL-2.0-or-later
+name: vm
+
+# Solaris-family systems in VMs (vmactions). They exercise src/platform/solaris/iterator.c, which
+# has never been compiled by anyone. EXPERIMENTAL: report only, nothing gates on them. Package
+# names for the compiler and GNU make differ between the systems and are unconfirmed; a failed
+# prepare shows up in the annotation. Run by hand (Actions > vm > Run workflow).
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "41 3 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  solaris:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: vmactions/solaris-vm@v1
+        with:
+          run: PREP="pkg install gnu-make gcc" sh tools/vm_build.sh solaris
+      - name: result
+        if: always()
+        run: bash tools/ci_run.sh "solaris" sh -c 'cat vm-solaris.log; exit "$(cat vm-solaris.rc)"'
+
+  omnios:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: vmactions/omnios-vm@v1
+        with:
+          run: PREP="pkg install gnu-make gcc14" sh tools/vm_build.sh omnios
+      - name: result
+        if: always()
+        run: bash tools/ci_run.sh "omnios" sh -c 'cat vm-omnios.log; exit "$(cat vm-omnios.rc)"'
+
+  openindiana:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: vmactions/openindiana-vm@v1
+        with:
+          run: PREP="pkg install build-essential" sh tools/vm_build.sh openindiana
+      - name: result
+        if: always()
+        run: bash tools/ci_run.sh "openindiana" sh -c 'cat vm-openindiana.log; exit "$(cat vm-openindiana.rc)"'

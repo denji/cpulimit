@@ -110,7 +110,8 @@ jobs:
             gmake WERROR=1 CFLAGS="-O2 -g" all
 
   # OpenBSD (vmactions/openbsd-vm). The iterator was written without an OpenBSD host, so this job
-  # reports but does not gate until it has gone green once.
+  # reports but does not gate until it has gone green once. The VM's transcript is copied back
+  # and turned into an annotation by the last step (see tools/vm_build.sh).
   openbsd:
     timeout-minutes: 30
     name: openbsd ${{ matrix.release }}
@@ -125,10 +126,10 @@ jobs:
       - uses: vmactions/openbsd-vm@v1
         with:
           release: ${{ matrix.release }}
-          prepare: pkg_add gmake
-          run: |
-            sh tools/ci_run.sh "openbsd build ${{ matrix.release }}" gmake WERROR=1 CFLAGS="-O2 -g" all
-            sh tools/ci_run.sh "openbsd tests ${{ matrix.release }}" gmake CFLAGS="-O2 -g" check SKIP_INTEGRATION=1
+          run: PREP="pkg_add gmake" sh tools/vm_build.sh openbsd
+      - name: result
+        if: always()
+        run: bash tools/ci_run.sh "openbsd ${{ matrix.release }}" sh -c 'cat vm-openbsd.log; exit "$(cat vm-openbsd.rc)"'
 
   # Real timing: one job, one compiler, nothing else running, so the numbers mean something.
   timing:

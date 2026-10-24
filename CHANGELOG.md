@@ -14,8 +14,13 @@ documented in `man cpulimit` are the public interface that 1.x keeps stable.
   unit tests. The iterator was written without an OpenBSD host: its reading of `p_rtime`,
   `p_ustart` and `KERN_PROC_ARGV` is unconfirmed until that job has passed, and the job does not
   gate until then.
+- `vm` workflow (manual and weekly, report only): tries to build and unit-test the Solaris iterator
+  on Solaris, OmniOS and OpenIndiana through `vmactions`. Package names for the compiler are
+  unconfirmed. `tools/vm_build.sh` keeps each VM's transcript in a file that a normal step turns
+  into an error annotation, because the VM actions only report "ssh exited with code N".
 
 ### Changed
+- `tools/ci_run.sh` is POSIX sh (no bash, no `pipefail`), so it runs inside the BSD VMs too.
 - Documentation and notices only, no change in behavior: `AUTHORS` file, a COPYRIGHT section
   in the man page, README reduced to install, usage and limitations. Upgrade notes moved to
   `docs/UPGRADING.md`, verification and benchmarks to `docs/VERIFICATION.md`.
