@@ -1,4 +1,4 @@
-# cpulimit architecture and verification plan
+# cpulimit architecture
 
 This document is normative for the code under `src/`. A change that breaks a
 rule below must change this document in the same commit.
@@ -41,8 +41,8 @@ know about the operating system's process interface.
   `main` forks the target, then runs the control loop itself. The target is its
   child, so its termination and exit status come from `waitpid()` rather than
   from polling, and there is no separate limiter process that could be orphaned.
-  (Before: parent + limiter child + target; signalling only the parent left the
-  limiter running unattended.)
+  (The original ran a parent, a limiter child and the target; signalling only the parent
+  left the limiter running unattended.)
 * **Attach mode** (`-p`, `-e`): one process; with `--daemon` it detaches first.
 
 Exit status in command mode is unchanged: the command's exit status, or the raw
@@ -69,7 +69,7 @@ may have stopped receives `SIGCONT` before `exit`.
 
 Not provable in-process: `SIGKILL` of cpulimit, an OOM kill or a crash while the
 target is in its stop slice leaves the target stopped. That is inherent to
-SIGSTOP-based throttling and is documented in the README; `kill -CONT` recovers.
+SIGSTOP-based throttling and is listed under known limitations in the README; `kill -CONT` recovers.
 
 ## 5. Control loop (one iteration)
 
@@ -87,7 +87,7 @@ SIGSTOP-based throttling and is documented in the README; `kill -CONT` recovers.
 ## 6. Process table (`process_group`)
 
 * A process is identified by **(pid, start time)**. A new process that reuses a
-  pid is a new entry. (Before: `assert()` abort.)
+  pid is a new entry. (The original aborted on `assert()`.)
 * Each update stamps the entries it sees with a generation number; entries not
   stamped are freed (terminated processes). The table size is bounded by the
   number of live processes.
@@ -129,13 +129,14 @@ before use. Keying on the start time means a recycled pid is a different target.
 | Performance | accuracy, limiter CPU, syscalls/s, `-i` scaling against a baseline binary | `tools/bench.sh` |
 | Portability | CI matrix: OS x compiler x libc x architecture | `.github/workflows/` |
 
-Limits of this plan, stated up front:
+Limits of this approach:
 
 * CBMC proofs are bounded (loops unwound to a stated depth) and cover three pure functions only.
-  Everything else is tested, not proved. The harnesses were exercised in simulation mode and with
-  mutants; CBMC itself had not been run when this was written.
-* The macOS, FreeBSD and Solaris iterators were adapted to the shared interface without being
-  compiled by the author. CI builds them but those jobs do not gate until they have passed once.
+  Everything else is tested, not proved. The harnesses also run in simulation mode and against
+  mutants. Which harnesses CBMC has finished is in [VERIFICATION.md](VERIFICATION.md).
+* The macOS, FreeBSD and Solaris iterators were adapted to the shared interface without a host to
+  compile them on. CI builds macOS and FreeBSD (Solaris is not built), and those jobs do not gate
+  until they have passed once.
 * Unreachable defensive clamps in `core/limiter.c` (lines that no input can reach) are not covered by
   tests; the CBMC harness is what shows they are unreachable.
 * `SIGKILL` or an OOM kill of cpulimit during a stop slice leaves the target stopped, and the

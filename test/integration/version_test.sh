@@ -1,4 +1,6 @@
 #!/bin/sh
+# Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
+# SPDX-License-Identifier: GPL-2.0-or-later
 # The version appears in three places that must agree: the binary (src/cli/cli.c), the man page and
 # the newest CHANGELOG entry. A release with a stale one is a bug nothing else would catch.
 set -eu

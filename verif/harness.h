@@ -1,3 +1,5 @@
+/* Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 /* Common layer for the verification harnesses in this directory.
  *
  * Each harness states a property over ALL inputs of a bounded shape, with nondeterministic

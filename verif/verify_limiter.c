@@ -1,3 +1,5 @@
+/* Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 /* compute_slices(): the controller arithmetic for every double, including NaN, infinities and
  * denormals. Properties = invariants L1-L4 of docs/ARCHITECTURE.md:
  *   L1  work_ns + stop_ns == chunk_ns

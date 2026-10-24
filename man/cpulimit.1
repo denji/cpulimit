@@ -114,7 +114,7 @@ Between reading a process and signalling it, its pid can in principle be
 recycled; the window is one control cycle. Processes are identified by pid and
 start time, which removes the much larger window of earlier versions.
 .IP \(bu 2
-Only Linux, macOS, FreeBSD and (best effort) Solaris/illumos have an iterator.
+Only Linux, macOS, FreeBSD and Solaris/illumos (not built or tested) have an iterator.
 Controlling processes of other users needs the privilege to signal them.
 .SH EXAMPLES
 .nf
@@ -124,7 +124,13 @@ cpulimit \-d \-s \-P /run/cpulimit.pid \-l 30 \-e backup
 cpulimit \-l 80 \-\- make \-j8
 .fi
 .SH AUTHORS
-Angelo Marletta, and the contributors of the forks this version descends from.
+Angelo Marletta, and the contributors listed in the AUTHORS file of the source distribution.
+.SH COPYRIGHT
+Copyright (C) 2005\-2012 Angelo Marletta
+.br
+Copyright (C) 2016\-2017, 2019, 2026 Denys Denysov
+.br
+License GPL\-2.0\-or\-later.
 .SH SEE ALSO
 .BR kill (1),
 .BR nice (1),

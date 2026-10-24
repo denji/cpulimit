@@ -1,10 +1,11 @@
 /**
  *
- * process_iterator_solaris.c
- * Copyright (C) 2016 by Jim Mason <jmason at ibinx dot com>
+ * platform/solaris/iterator.c
+ * Copyright (C) 2016 Jim Mason
  *
- * Adapted from process_iterator_linux.c
- * Copyright (C) 2005-2012, by:  Angelo Marletta <angelo dot marletta at gmail dot com>
+ * Adapted from platform/linux/iterator.c
+ * Copyright (C) 2005-2012 Angelo Marletta
+ * Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License

@@ -1,3 +1,5 @@
+/* Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 /* parse_proc_stat() on every well-formed line of one fixed shape: pid 1, a command name of one
  * arbitrary non-NUL byte, a state letter, and 19 numeric fields (4 to 22) of ONE symbolic digit
  * each. The bytes that make the line well formed are constants, so the solver only has to reason

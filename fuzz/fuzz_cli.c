@@ -1,3 +1,5 @@
+/* Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 /* Fuzz target for cli_parse(). The input is split at NUL bytes into an argv (at most 32 words).
  *
  * Properties checked on every successful parse (the validated configuration is what the rest of

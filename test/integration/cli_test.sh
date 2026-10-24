@@ -1,4 +1,6 @@
 #!/bin/sh
+# Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
+# SPDX-License-Identifier: GPL-2.0-or-later
 # Command-line behaviour tests. Usage: BUILD=build sh test/integration/cli_test.sh
 # None of the cases below can touch an existing process: every invalid case is
 # rejected before a target is looked up, and valid cases only limit a command

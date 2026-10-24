@@ -1,4 +1,6 @@
 #!/bin/sh
+# Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
+# SPDX-License-Identifier: GPL-2.0-or-later
 # Run the verification harnesses.
 #   sh tools/verif.sh sim    random testing of the harness properties (any C compiler, no CBMC)
 #   sh tools/verif.sh cbmc   bounded model checking of the same harnesses (needs cbmc)

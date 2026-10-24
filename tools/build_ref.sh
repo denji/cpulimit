@@ -1,4 +1,6 @@
 #!/bin/sh
+# Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
+# SPDX-License-Identifier: GPL-2.0-or-later
 # Build cpulimit as it was at a git ref and print the path of the binary:
 #
 #   sh tools/build_ref.sh REF DIR     (REF: any commit-ish; DIR: a new worktree, removed first if present)

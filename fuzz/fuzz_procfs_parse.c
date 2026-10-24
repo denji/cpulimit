@@ -1,3 +1,5 @@
+/* Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 /* Fuzz target for parse_proc_stat() and ticks_to_ms().
  *
  * Properties checked for every input, not just "does not crash":

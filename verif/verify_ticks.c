@@ -1,3 +1,5 @@
+/* Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 /* ticks_to_ms(): exact for every input, saturating at INT64_MAX, 0 for an unusable rate.
  * The specification is the one-line 128-bit formula; CBMC supports __int128. */
 #include "harness.h"

@@ -1,3 +1,5 @@
+/* Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 /* A scripted stand-in for the platform process iterator, so process_group.c can be
  * tested deterministically: pid reuse, vanished processes, exact CPU arithmetic.
  * Link it INSTEAD of process_iterator.o. */

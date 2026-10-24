@@ -1,4 +1,6 @@
 #!/bin/sh
+# Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
+# SPDX-License-Identifier: GPL-2.0-or-later
 # Load and memory tests for the limiter. Not part of "make check" (it takes ~1 minute);
 #   BUILD=build sh test/integration/stress_test.sh        make stress
 #

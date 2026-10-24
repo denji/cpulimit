@@ -1,3 +1,5 @@
+# Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
+# SPDX-License-Identifier: GPL-2.0-or-later
 name: cbmc
 
 # Bounded model checking of the harnesses in verif/. EXPERIMENTAL and kept out of the push

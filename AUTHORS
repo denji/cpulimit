@@ -1,0 +1,16 @@
+cpulimit is free software (GPL-2.0-or-later, see LICENSE). This file records who contributed,
+for the history; the copyright notices are in the source file headers.
+
+Angelo Marletta       original program, 2005-2012
+Simon Sigurdhsson     macOS process iterator, 2012
+Helder Magalhaes      README, 2012
+Paul Praet            fix for a crash on CTRL-C, 2013
+Robert Pogorzelski    multi-core handling, 2013
+dt1973                FreeBSD build fixes, README in Markdown, 2015
+Tobias Tangemann      crash fix, 2015
+mtburn                minimum CPU threshold for limited processes (-m), 2015
+Pavel Timofeev        crash fix, 2016
+Jim Mason             Solaris process iterator, 2016-2018
+Bob Vincent           Makefile (install, static, strip targets), --version, man page, 2017-2019
+Tim Allen             chunk size option (-c), 2019
+Denys Denysov         maintenance of this fork, redesign and 1.x releases, 2016-2017, 2019, 2026

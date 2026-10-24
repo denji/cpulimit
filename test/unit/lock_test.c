@@ -1,3 +1,5 @@
+/* Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 /* target_lock_acquire(): one limiter per target, safe directory handling. */
 #include <errno.h>
 #include <fcntl.h>

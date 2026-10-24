@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
+# SPDX-License-Identifier: GPL-2.0-or-later
 # Run a command; when it fails, repeat the interesting part of its output as a GitHub error
 # annotation:   bash tools/ci_run.sh LABEL command args...
 # Annotations can be read through the checks API without logging in, which the raw job log

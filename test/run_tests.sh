@@ -1,4 +1,6 @@
 #!/bin/sh
+# Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
+# SPDX-License-Identifier: GPL-2.0-or-later
 # Test driver. Usage: BUILD=build sh test/run_tests.sh
 # Each test is a program that exits 0 on success. A failing test does not stop
 # the run; the script exits non-zero if any test failed.

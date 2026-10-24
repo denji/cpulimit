@@ -1,3 +1,5 @@
+/* Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 /* Minimal assertion macro for the unit tests. Unlike assert() it does not
  * depend on NDEBUG, so a test can never silently turn into a no-op. */
 #ifndef CPULIMIT_TEST_CHECK_H

@@ -1,4 +1,6 @@
 #!/bin/sh
+# Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
+# SPDX-License-Identifier: GPL-2.0-or-later
 # Compare two cpulimit binaries (a baseline and a candidate) on the same machine, back to back.
 #
 #   sh tools/bench.sh BASELINE_BIN CANDIDATE_BIN BUSY_BIN [SECONDS]

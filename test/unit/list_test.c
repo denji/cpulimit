@@ -1,3 +1,5 @@
+/* Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 /* list.c against a model: every operation is applied to the list and to a plain array, and the
  * two are compared after each step (order, count, first/last, links in both directions).
  * Built with the fault-injecting allocator, so leaks and add_elem() failure are checked too. */

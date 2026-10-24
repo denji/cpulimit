@@ -1,4 +1,6 @@
 #!/bin/sh
+# Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
+# SPDX-License-Identifier: GPL-2.0-or-later
 # Mutation check of the unit tests: re-introduce one defect at a time into a scratch copy of the
 # tree and require that the unit tests (test/run_tests.sh with SKIP_INTEGRATION=1) fail.
 # A SURVIVED line is a gap in the tests, or an equivalent mutant (which cannot change behavior);

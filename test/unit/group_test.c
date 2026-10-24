@@ -1,3 +1,5 @@
+/* Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 /* process_group.c against a scripted iterator and an allocator that can fail. */
 #include <math.h>
 #include <stdint.h>

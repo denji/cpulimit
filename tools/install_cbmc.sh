@@ -1,4 +1,6 @@
 #!/bin/sh
+# Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
+# SPDX-License-Identifier: GPL-2.0-or-later
 # Install CBMC on an Ubuntu runner: the newest release .deb for this Ubuntu version from
 # github.com/diffblue/cbmc, falling back to the distribution package (older, MiniSAT only).
 # Prints the version and which solver back ends this build offers.

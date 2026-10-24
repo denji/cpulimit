@@ -1,4 +1,6 @@
 #!/bin/sh
+# Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
+# SPDX-License-Identifier: GPL-2.0-or-later
 # Integration tests: the real cpulimit against real processes. Linux only (reads /proc).
 # Usage: BUILD=build sh test/integration/integration_test.sh
 #   CPULIMIT_SKIP_TIMING=1   skip the checks that measure CPU shares (emulators, overloaded hosts)

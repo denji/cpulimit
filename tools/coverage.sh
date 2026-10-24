@@ -1,4 +1,6 @@
 #!/bin/sh
+# Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
+# SPDX-License-Identifier: GPL-2.0-or-later
 # Line and branch coverage of src/ from the whole test suite, using gcov only.
 #   CC=gcc BUILD=build/cov sh tools/coverage.sh
 # Prints one row per source file and writes the uncovered lines to $BUILD/uncovered.txt.

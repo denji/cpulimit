@@ -7,6 +7,13 @@ documented in `man cpulimit` are the public interface that 1.x keeps stable.
 
 ## [Unreleased]
 
+### Changed
+- Documentation and notices only, no change in behavior: `AUTHORS` file, a COPYRIGHT section
+  in the man page, README reduced to install, usage and limitations. Upgrade notes moved to
+  `docs/UPGRADING.md`, verification and benchmarks to `docs/VERIFICATION.md`.
+- README and docs state the real CI coverage of macOS (build and unit tests), FreeBSD (build only)
+  and Solaris (not built); OpenBSD, NetBSD and DragonFly are listed as unsupported.
+
 ## [1.0.2] - 2026-10-24
 
 Maintenance release: source tree reorganized, CI repaired. No change to options, exit statuses or
@@ -108,7 +115,7 @@ First release of the fork after the redesign. Starts from the upstream 0.3.2 cod
 - A pid can be recycled between reading a process and signalling it; one control cycle of window
   remains.
 - Multi-threaded targets are limited as a whole, not per thread.
-- **Not verified:** macOS 14/15 and FreeBSD 14.1 pass in CI but the author has never run cpulimit
+- **Not verified:** macOS 14/15 and FreeBSD 14.1 pass in CI but cpulimit has not been run
   on them by hand; Solaris/illumos has never been built.
 - **CBMC:** the bounded-model-checking jobs fail and are experimental; no property is claimed
   proved. The same properties are checked by randomized simulation (`make verif-sim`).

@@ -1,3 +1,5 @@
+# Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
+# SPDX-License-Identifier: GPL-2.0-or-later
 name: ci
 
 on:
@@ -69,9 +71,9 @@ jobs:
 
   # macOS has its own process iterator (libproc). Only the portable unit tests exist there:
   # the integration test relies on /proc and is Linux-only.
-  # The macOS, FreeBSD iterators were adapted to the new interface WITHOUT being compiled by their
-  # author (no such host was available), so these two jobs report but do not gate until they
-  # have gone green once. Remove `continue-on-error` then.
+  # The macOS and FreeBSD iterators were adapted to the current interface without a host to compile
+  # them on, so these two jobs report but do not gate until they have gone green once.
+  # Remove `continue-on-error` then.
   macos:
     timeout-minutes: 30
     name: ${{ matrix.os }}

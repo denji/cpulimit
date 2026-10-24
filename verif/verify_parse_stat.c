@@ -1,3 +1,5 @@
+/* Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 /* parse_proc_stat() on every NUL-terminated string of up to MAXLEN (48) bytes. The shortest line
  * that reaches field 22 is 46 bytes ("1 (x) S 0 0 ... 0": 22 one-character fields), so the bound
  * covers every field, but only with short numbers: long numbers (overflow of the 64-bit parse)

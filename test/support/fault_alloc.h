@@ -1,3 +1,5 @@
+/* Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 /* Allocator used by the group/list tests (see src/core/alloc.h): it can be told to fail
  * from the n-th allocation on, and it counts live allocations so a leak is a plain
  * failed CHECK instead of something only a sanitizer could notice. */

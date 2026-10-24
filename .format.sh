@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 # Search in the script folder
 pushd "$(dirname $0)" >/dev/null

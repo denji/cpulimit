@@ -1,3 +1,5 @@
+# Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
+# SPDX-License-Identifier: GPL-2.0-or-later
 # cpulimit - GNU make required (use gmake on the BSDs and illumos/Solaris).
 #
 # Targets:    all  check  man  install  uninstall  static  static-install
