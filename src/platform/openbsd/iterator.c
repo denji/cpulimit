@@ -26,10 +26,12 @@
  * the same snapshot logic selects the target and its descendants.
  *
  * STATUS: written without access to an OpenBSD host and checked only by the OpenBSD job in CI
- * (build and unit tests). Until that job has passed, treat the field meanings below as
- * unconfirmed: p_rtime is the CPU time of the process (what ps(1) prints as TIME), p_ustart is
- * its start time, and the first argument string follows the argv pointer array in the buffer
- * returned by KERN_PROC_ARGV. */
+ * (build and unit tests). The first run built with -Werror, but the process-table test saw a CPU
+ * usage above 1.2 and command mode timed out. The likely causes, not yet confirmed, were
+ * addressed: p_rtime advancing only when a process is switched out (now the statistics ticks are
+ * used) and zombies not being recognised (p_stat, SDEAD and PS_ZOMBIE are all checked). Still
+ * unconfirmed: the statistics tick rate, and that the first argument string follows the argv
+ * pointer array in the buffer returned by KERN_PROC_ARGV. */
 
 #include <errno.h>
 #include <stdio.h>
@@ -41,8 +43,13 @@
 
 #include "platform/iterator.h"
 
+/* Values from <sys/proc.h>, which userland may not see; used only when the header does not
+ * define them. */
 #ifndef SZOMB
 #define SZOMB 5
+#endif
+#ifndef SDEAD
+#define SDEAD 6
 #endif
 
 /* One process as seen by the snapshot taken in init_process_iterator(). */
@@ -86,12 +93,34 @@ static struct kinfo_proc *fetch_procs(int op, int arg, size_t *count) {
     return NULL;
 }
 
+/* Statistics clock rate: p_uticks, p_sticks and p_iticks count its ticks. */
+static int64_t stat_hz(void) {
+    static int64_t hz;
+    if (hz == 0) {
+        int mib[2] = { CTL_KERN, KERN_CLOCKRATE };
+        struct clockinfo ci;
+        size_t len = sizeof(ci);
+        if (sysctl(mib, 2, &ci, &len, NULL, 0) == 0 && len == sizeof(ci)) {
+            hz = ci.stathz > 0 ? ci.stathz : ci.hz;
+        }
+        if (hz <= 0) {
+            hz = 100;
+        }
+    }
+    return hz;
+}
+
 /* 0 when the entry is a live process that cpulimit may consider: not a zombie, not a kernel
  * thread. */
 static int to_rec(const struct kinfo_proc *kp, struct bsd_rec *r) {
-    if (kp->p_stat == SZOMB) {
+    if (kp->p_stat == SZOMB || kp->p_stat == SDEAD) {
         return -1;
     }
+#ifdef PS_ZOMBIE
+    if (kp->p_psflags & PS_ZOMBIE) {
+        return -1;
+    }
+#endif
 #ifdef PS_SYSTEM
     if (kp->p_psflags & PS_SYSTEM) {
         return -1;
@@ -100,7 +129,11 @@ static int to_rec(const struct kinfo_proc *kp, struct bsd_rec *r) {
     r->pid = (pid_t)kp->p_pid;
     r->ppid = (pid_t)kp->p_ppid;
     r->starttime = (int64_t)kp->p_ustart_sec * 1000000 + (int64_t)kp->p_ustart_usec;
-    r->cputime = (int64_t)kp->p_rtime_sec * 1000 + (int64_t)kp->p_rtime_usec / 1000;
+    /* CPU time from the statistics ticks: the kernel adds them to a running process at every
+     * statistics clock tick. p_rtime is only added to when the process is switched out, so a
+     * process that is on a CPU for a whole 100 ms scheduling quantum would be seen using nothing
+     * and then twice its share. */
+    r->cputime = (int64_t)(kp->p_uticks + kp->p_sticks + kp->p_iticks) * 1000 / stat_hz();
     r->selected = 0;
     memcpy(r->comm, kp->p_comm, sizeof(r->comm));
     r->comm[sizeof(r->comm) - 1] = '\0';

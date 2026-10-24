@@ -6,3 +6,5 @@ src/cpulimit
 src/cpulimit.1
 vm-*.log
 vm-*.rc
+vm-*.probe
+iterprobe

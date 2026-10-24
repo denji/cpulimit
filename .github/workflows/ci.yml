@@ -130,6 +130,13 @@ jobs:
       - name: result
         if: always()
         run: bash tools/ci_run.sh "openbsd ${{ matrix.release }}" sh -c 'cat vm-openbsd.log; exit "$(cat vm-openbsd.rc)"'
+      - name: probe
+        if: always()
+        run: |
+          if [ -f vm-openbsd.probe ]; then
+            msg=$(tr -d '\r' < vm-openbsd.probe | sed -e 's/%/%25/g' | awk '{ printf "%s%%0A", $0 }' | cut -c1-8000)
+            echo "::notice title=openbsd ${{ matrix.release }} probe::${msg}"
+          fi
 
   # Real timing: one job, one compiler, nothing else running, so the numbers mean something.
   timing:
