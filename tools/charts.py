@@ -101,28 +101,7 @@ def coverage():
     return svg(h, 'Line and branch coverage per source file, with the 85 percent line gate', ''.join(s))
 
 
-def ci():
-    c = data['ci']
-    groups = c['groups']
-    assert sum(g['passed'] + g['failed'] for g in groups) == c['total_checks'], 'CI group counts do not add up'
-    rowh, top, left = 30, 34, 280
-    h = top + rowh * len(groups) + 8
-    unit = (W - left - 60) / max(g['passed'] + g['failed'] for g in groups)
-    s = [f'<text class="ax" x="16" y="14">checks of one commit: passed (filled) and failed (dashed outline), total {c["total_checks"]}</text>']
-    for i, g in enumerate(groups):
-        y = top + i * rowh
-        s.append(f'<text class="lab" x="{left-10}" y="{y+13}" text-anchor="end">{escape(g["name"])}</text>')
-        w = g['passed'] * unit
-        if g['passed']:
-            s.append(f'<rect class="bar new" x="{left}" y="{y}" width="{w:.1f}" height="18"/>')
-        if g['failed']:
-            s.append(f'<rect class="bar fail" x="{left+w:.1f}" y="{y}" width="{g["failed"]*unit:.1f}" height="18"/>')
-        s.append(f'<text class="val" x="{left+(g["passed"]+g["failed"])*unit+8:.1f}" y="{y+13}">{g["passed"]}'
-                 + (f' passed, {g["failed"]} failed' if g['failed'] else '') + '</text>')
-    return svg(h, 'CI check results of one commit, grouped', ''.join(s))
-
-
-CHARTS = {'accuracy': accuracy, 'overhead': overhead, 'coverage': coverage, 'ci': ci}
+CHARTS = {'accuracy': accuracy, 'overhead': overhead, 'coverage': coverage}
 
 def main():
     path = f'{ROOT}/index.html'
