@@ -7,6 +7,14 @@ documented in `man cpulimit` are the public interface that 1.x keeps stable.
 
 ## [Unreleased]
 
+ 
+### Added
+- OpenBSD process iterator (`src/platform/openbsd/iterator.c`, `sysctl` kern.proc, no libkvm) and
+  an OpenBSD CI job (8.0 and 7.9, `vmactions/openbsd-vm`) that builds with `-Werror` and runs the
+  unit tests. The iterator was written without an OpenBSD host: its reading of `p_rtime`,
+  `p_ustart` and `KERN_PROC_ARGV` is unconfirmed until that job has passed, and the job does not
+  gate until then.
+
 ### Changed
 - Documentation and notices only, no change in behavior: `AUTHORS` file, a COPYRIGHT section
   in the man page, README reduced to install, usage and limitations. Upgrade notes moved to

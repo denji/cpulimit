@@ -109,6 +109,27 @@ jobs:
             sudo pkg install -y gmake
             gmake WERROR=1 CFLAGS="-O2 -g" all
 
+  # OpenBSD (vmactions/openbsd-vm). The iterator was written without an OpenBSD host, so this job
+  # reports but does not gate until it has gone green once.
+  openbsd:
+    timeout-minutes: 30
+    name: openbsd ${{ matrix.release }}
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ["8.0", "7.9"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: vmactions/openbsd-vm@v1
+        with:
+          release: ${{ matrix.release }}
+          prepare: pkg_add gmake
+          run: |
+            gmake WERROR=1 CFLAGS="-O2 -g" all
+            gmake CFLAGS="-O2 -g" check SKIP_INTEGRATION=1
+
   # Real timing: one job, one compiler, nothing else running, so the numbers mean something.
   timing:
     timeout-minutes: 30

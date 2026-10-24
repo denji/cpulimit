@@ -25,7 +25,7 @@
 #include <string.h>
 #ifdef __sun__
     #include <procfs.h>
-#elif !defined __APPLE__
+#elif !defined __APPLE__ && !defined __OpenBSD__
     #include <unistd.h>
     #include <sys/procfs.h>
 #endif
@@ -45,6 +45,10 @@
 #elif defined __APPLE__
 
     #include "macos/iterator.c"
+
+#elif defined __OpenBSD__
+
+    #include "openbsd/iterator.c"
 
 #elif defined __sun__
 

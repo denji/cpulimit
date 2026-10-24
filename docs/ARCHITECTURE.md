@@ -17,7 +17,7 @@ src/main.c  (main, control loop, signals)
   ├─ cli/cli.c               argv -> struct cli_config     pure, no exit(), no globals
   ├─ core/limiter.c          controller arithmetic         pure, no I/O
   ├─ core/process_group.c    per-target process table      depends on the iterator + alloc seam
-  │    └─ platform/iterator.c  selects one of platform/{linux,macos,freebsd,solaris}/iterator.c
+  │    └─ platform/iterator.c  selects one of platform/{linux,macos,freebsd,openbsd,solaris}/iterator.c
   │         └─ platform/procfs_parse.c   /proc/<pid>/stat parser   pure, no allocation
   ├─ runtime/lock.c          one limiter per target        fcntl record lock
   ├─ runtime/daemon.c        detach from the terminal
@@ -27,8 +27,8 @@ src/main.c  (main, control loop, signals)
   └─ core/alloc.h            allocation seam (tests inject failures)
 
 Adding a platform is one new file, `src/platform/<os>/iterator.c`, plus a branch in
-`src/platform/iterator.c`; nothing else includes platform code. OpenBSD, NetBSD and DragonFly have
-no iterator yet and are not built.
+`src/platform/iterator.c`; nothing else includes platform code. NetBSD and DragonFly have no
+iterator yet and are not built.
 ```
 
 Rules: modules marked *pure* never call `exit()`, never touch global state and
@@ -134,9 +134,9 @@ Limits of this approach:
 * CBMC proofs are bounded (loops unwound to a stated depth) and cover three pure functions only.
   Everything else is tested, not proved. The harnesses also run in simulation mode and against
   mutants. Which harnesses CBMC has finished is in [VERIFICATION.md](VERIFICATION.md).
-* The macOS, FreeBSD and Solaris iterators were adapted to the shared interface without a host to
-  compile them on. CI builds macOS and FreeBSD (Solaris is not built), and those jobs do not gate
-  until they have passed once.
+* The macOS, FreeBSD, OpenBSD and Solaris iterators were written or adapted without a host to
+  compile them on. CI builds macOS, FreeBSD and OpenBSD (Solaris is not built), and those jobs do
+  not gate until they have passed once.
 * Unreachable defensive clamps in `core/limiter.c` (lines that no input can reach) are not covered by
   tests; the CBMC harness is what shows they are unreachable.
 * `SIGKILL` or an OOM kill of cpulimit during a stop slice leaves the target stopped, and the
