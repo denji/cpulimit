@@ -25,15 +25,20 @@
  * processes are copied into a snapshot when the iterator is initialised, as on macOS and Linux;
  * the same snapshot logic selects the target and its descendants.
  *
- * STATUS: written without access to an OpenBSD host and checked only by the OpenBSD job in CI
- * (build and unit tests). The first run built with -Werror, but the process-table test saw a CPU
- * usage above 1.2 and command mode timed out. The likely causes, not yet confirmed, were
- * addressed: p_rtime advancing only when a process is switched out (now the statistics ticks are
- * used) and zombies not being recognised (p_stat, SDEAD and PS_ZOMBIE are all checked). Still
- * unconfirmed: the statistics tick rate, and that the first argument string follows the argv
- * pointer array in the buffer returned by KERN_PROC_ARGV. */
+ * Facts this file relies on, from the OpenBSD sources (sys/kern/kern_sysctl.c, sys/sys/sysctl.h)
+ * and from a probe run in CI (test/support/iterprobe.c, OpenBSD 8.0, hz = stathz = 100):
+ *  - KERN_PROC_ALL returns every process except kernel threads, zombies included.
+ *  - A zombie has p_stat == SDEAD and its tick counters are 0.
+ *  - p_rtime is only brought up to date when a process is switched out: for a busy process it
+ *    advanced in 200 ms steps. p_uticks, p_sticks and p_iticks (statistics clock hits) advance
+ *    continuously, about 6 per 50 ms, so they are the CPU time source.
+ *  - KERN_PROC_ARGV returns cnt + 1 pointers (the last NULL) followed by the strings.
+ * The unit tests (process table, name matching through KERN_PROC_ARGV, zombies, descendants) and the
+ * command-mode tests pass on OpenBSD 7.9 in CI; on 8.0 the only failure was the timing bound of one
+ * test (see test/unit/process_iterator_test.c). */
 
 #include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,6 +47,10 @@
 #include <sys/sysctl.h>
 
 #include "platform/iterator.h"
+
+#ifndef ARG_MAX
+#define ARG_MAX 524288
+#endif
 
 /* Values from <sys/proc.h>, which userland may not see; used only when the header does not
  * define them. */
@@ -218,7 +227,7 @@ int init_process_iterator(struct process_iterator *it, struct process_filter *fi
  * Returns 0 on success, -1 when it cannot be read (gone, not ours, empty). */
 static int read_argv0(pid_t pid, char *out, size_t outsz) {
     size_t cap = 4096;
-    while (cap <= 262144) {
+    while (cap <= (size_t)ARG_MAX) {
         int mib[4] = { CTL_KERN, KERN_PROC_ARGS, (int)pid, KERN_PROC_ARGV };
         size_t len = cap, nptr = 0, start;
         char *buf = (char *)malloc(cap);

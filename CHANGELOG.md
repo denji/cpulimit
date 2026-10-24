@@ -13,7 +13,9 @@ documented in `man cpulimit` are the public interface that 1.x keeps stable.
   an OpenBSD CI job (8.0 and 7.9, `vmactions/openbsd-vm`) that builds with `-Werror` and runs the
   unit tests. The iterator was written without an OpenBSD host: its reading of `p_rtime`,
   `p_ustart` and `KERN_PROC_ARGV` is unconfirmed until that job has passed, and the job does not
-  gate until then.
+  gate until then. A probe run in the VM (`test/support/iterprobe.c`) showed that the kernel's
+  `p_rtime` advances only in 200 ms steps for a busy process, so the CPU time comes from the
+  statistics tick counters; zombies are reported with `p_stat == SDEAD`.
 - `vm` workflow (manual and weekly, report only): tries to build and unit-test the Solaris iterator
   on Solaris, OmniOS and OpenIndiana through `vmactions`. Package names for the compiler are
   unconfirmed. `tools/vm_build.sh` keeps each VM's transcript in a file that a normal step turns

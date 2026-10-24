@@ -168,6 +168,18 @@ void test_process_group_all() {
     CHECK(close_process_group(&pgroup) == 0);
 }
 
+/* Upper bound for one 50 ms sample of a busy child. OpenBSD counts CPU time in statistics-clock
+ * ticks (10 ms) taken at randomized instants: its probe (tools/vm_build.sh, test/support/
+ * iterprobe.c) showed 5 to 7 ticks in consecutive 50 ms samples of one busy process, so a sample
+ * can read 1.4 or a little more while the average over the run is right. The bound is a sanity
+ * check: the first OpenBSD source for the CPU time, p_rtime, advances in 200 ms steps and reads
+ * 4.0 in one sample and 0 in the next, which this bound still rejects. */
+#ifdef __OpenBSD__
+#define SAMPLE_USAGE_MAX 1.7
+#else
+#define SAMPLE_USAGE_MAX 1.2
+#endif
+
 //A busy child must be measured at about one CPU. CPU accounting is meaningless under
 //emulation or heavy contention, so CPULIMIT_SKIP_TIMING=1 skips only the numeric check.
 void test_process_group_single(int include_children) {
@@ -194,7 +206,7 @@ void test_process_group_single(int include_children) {
             struct process *p = (struct process *)(node->data);
             CHECK(p->pid == child);
             CHECK(p->ppid == getpid());
-            CHECK(p->cpu_usage <= 1.2);
+            CHECK(p->cpu_usage <= SAMPLE_USAGE_MAX);
             tot_usage += p->cpu_usage;
             count++;
         }
