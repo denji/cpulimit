@@ -7,6 +7,11 @@ documented in `man cpulimit` are the public interface that 1.x keeps stable.
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-10-24
+
+Maintenance release: source tree reorganized, CI repaired. No change to options, exit statuses or
+log text; the throttling logic is the 1.0.1 logic.
+
 ### Fixed
 - `bench` workflow: the baseline build assumed the original `src/Makefile` layout and failed for any
   modernized ref. `tools/build_ref.sh REF DIR` builds either layout and prints the binary path.
@@ -15,13 +20,16 @@ documented in `man cpulimit` are the public interface that 1.x keeps stable.
   short-input parser harnesses use smaller bounded domains (the full-range formulas never finished
   building). `verify_parse_stat_line` has been verified once by CBMC (run 39890593464).
 
+### Tests
+- `compute_slices`: a NaN limit on the first cycle and an infinite measurement are now tested. This
+  kills the mutant "NaN not mapped to 1", which survived once the mutation script ran against a
+  verified baseline (20 of 20 killed).
+
 ### Changed
 - Source tree reorganized by role, no behavior change (same binary logic, same tests, coverage
   89.2% / 78.6% as before): `src/{cli,core,runtime,platform,util}/`, one directory per platform
   under `src/platform/`, tests split into `test/{unit,integration,support}/`, `scripts/` and
   `bench/` merged into `tools/`. `src/cpulimit` is still built for scripts that expect it.
-- `compute_slices`: the rate is `target / pcpu` (or 1), which cannot produce a NaN from an infinite
-  measurement; new limiter tests and the mutation suite (20/20) cover it.
 - CBMC moved out of the push workflows into `cbmc.yml` (manual and weekly): one job per harness and
   solver back end (default, CaDiCaL when the installed CBMC offers it; Bitwuzla via SMT2 was tried and failed), exit status and
   time in the job summary, newest CBMC release installed by `tools/install_cbmc.sh`. The random-test
