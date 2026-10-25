@@ -24,9 +24,9 @@
 
 #define CPULIMIT_LIST_H
 
-#ifndef  TRUE
-    #define TRUE 1
-    #define FALSE 0
+#ifndef TRUE
+#define TRUE 1
+#define FALSE 0
 #endif
 
 struct list_node {
@@ -52,25 +52,25 @@ struct list {
 /*
  * Initialize a list, with a specified key size
  */
-void init_list(struct list *l,int keysize);
+void init_list(struct list *l, int keysize);
 
 /*
  * Add a new element at the end of the list
  * return the pointer to the new node, or NULL if memory is exhausted
  * (the list is then unchanged)
  */
-struct list_node *add_elem(struct list *l,void *elem);
+struct list_node *add_elem(struct list *l, void *elem);
 
 /*
  * Delete a node
  */
-void delete_node(struct list *l,struct list_node *node);
+void delete_node(struct list *l, struct list_node *node);
 
 /*
  * Delete a node from the list, even the content pointed by it
  * Use only when the content is a dynamically allocated pointer
  */
-void destroy_node(struct list *l,struct list_node *node);
+void destroy_node(struct list *l, struct list_node *node);
 
 /*
  * Check whether a list is empty or not
@@ -110,22 +110,22 @@ struct list_node *last_node(struct list *l);
  * if the element is found, return the node address
  * else return NULL
  */
-struct list_node *xlocate_node(struct list *l,void *elem,int offset,int length);
+struct list_node *xlocate_node(struct list *l, void *elem, int offset, int length);
 
 /*
  * The same of xlocate_node(), but return the content of the node
  */
-void *xlocate_elem(struct list *l,void *elem,int offset,int length);
+void *xlocate_elem(struct list *l, void *elem, int offset, int length);
 
 /*
  * The same of calling xlocate_node() with offset=0 and length=0
  */
-struct list_node *locate_node(struct list *l,void *elem);
+struct list_node *locate_node(struct list *l, void *elem);
 
 /*
  * The same of locate_node, but return the content of the node
  */
-void *locate_elem(struct list *l,void *elem);
+void *locate_elem(struct list *l, void *elem);
 
 /*
  * Delete all the elements in the list

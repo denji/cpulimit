@@ -47,7 +47,7 @@ static void test_cpu_usage_arithmetic(void) {
     CHECK(init_process_group(&pg, 100, 0) == 0);
     CHECK(pg.proclist->count == 1);
     p = listed(&pg, 100);
-    CHECK(p != NULL && p->cpu_usage == -1);  /* not measured yet */
+    CHECK(p != NULL && p->cpu_usage == -1); /* not measured yet */
     t = pg.last_update_ns;
 
     /* 25 ms of CPU in 50 ms: the first sample is taken as is */
@@ -81,7 +81,7 @@ static void test_pid_reuse(void) {
     struct process_group pg;
     struct fake_proc s1[] = { { 100, 1, 5, 0 } };
     struct fake_proc s2[] = { { 100, 1, 5, 25 } };
-    struct fake_proc s3[] = { { 100, 1, 99, 3 } };   /* same pid, different start time */
+    struct fake_proc s3[] = { { 100, 1, 99, 3 } }; /* same pid, different start time */
     struct fake_proc s4[] = { { 100, 1, 99, 53 } };
     struct process *p;
     int64_t t;
@@ -98,12 +98,12 @@ static void test_pid_reuse(void) {
     p = listed(&pg, 100);
     CHECK(pg.proclist->count == 1 && stored_count(&pg) == 1);
     CHECK(p != NULL && p->starttime == 99 && p->cputime == 3);
-    CHECK(p->cpu_usage == -1);  /* a new process, nothing inherited from the dead one */
+    CHECK(p->cpu_usage == -1); /* a new process, nothing inherited from the dead one */
 
     fake_set_snapshot(s4, 1);
     CHECK(update_process_group_at(&pg, t + 150 * MS) == 0);
     p = listed(&pg, 100);
-    CHECK(p != NULL && fabs(p->cpu_usage - 1.0) < 1e-12);  /* 50 ms in 50 ms */
+    CHECK(p != NULL && fabs(p->cpu_usage - 1.0) < 1e-12); /* 50 ms in 50 ms */
     CHECK(close_process_group(&pg) == 0);
     CHECK(fault_outstanding() == 0);
 }
@@ -124,7 +124,7 @@ static void test_terminated_processes_are_purged(void) {
     CHECK(update_process_group_at(&pg, t + 50 * MS) == 0);
     CHECK(pg.proclist->count == 1);
     CHECK(stored_count(&pg) == 1);
-    CHECK(remove_process(&pg, 101) == 2);  /* already purged */
+    CHECK(remove_process(&pg, 101) == 2); /* already purged */
 
     /* churn: 2000 short-lived processes, one per cycle, next to a long-lived one */
     for (i = 0; i < 2000; i++) {
@@ -152,12 +152,12 @@ static void test_remove_process(void) {
     fake_set_snapshot(two, 2);
     CHECK(init_process_group(&pg, 0, 0) == 0);
     CHECK(remove_process(&pg, 100) == 0);
-    CHECK(listed(&pg, 100) == NULL);         /* also dropped from the list: no dangling pointer */
+    CHECK(listed(&pg, 100) == NULL); /* also dropped from the list: no dangling pointer */
     CHECK(pg.proclist->count == 1);
     CHECK(stored_count(&pg) == 1);
-    CHECK(remove_process(&pg, 100) == 2);    /* unknown now */
-    CHECK(remove_process(&pg, 4000) != 0);   /* never existed */
-    CHECK(remove_process(&pg, -1) != 0);     /* a negative pid must not crash the hash */
+    CHECK(remove_process(&pg, 100) == 2);  /* unknown now */
+    CHECK(remove_process(&pg, 4000) != 0); /* never existed */
+    CHECK(remove_process(&pg, -1) != 0);   /* a negative pid must not crash the hash */
     CHECK(close_process_group(&pg) == 0);
     CHECK(fault_outstanding() == 0);
 }
@@ -171,7 +171,7 @@ static void test_empty_and_wrong_pid(void) {
     CHECK(update_process_group(&pg) == 0);
     CHECK(pg.proclist->count == 0);
     CHECK(close_process_group(&pg) == 0);
-    CHECK(close_process_group(&pg) == 0);  /* safe to close twice */
+    CHECK(close_process_group(&pg) == 0); /* safe to close twice */
     CHECK(fault_outstanding() == 0);
 }
 
@@ -185,7 +185,7 @@ static int scenario(void) {
     int64_t t;
     fake_set_snapshot(a, ARRAY_LEN(a));
     if (init_process_group(&pg, 0, 0) != 0) {
-        return 1;  /* init closes the group itself when it fails */
+        return 1; /* init closes the group itself when it fails */
     }
     t = pg.last_update_ns;
     fake_set_snapshot(b, ARRAY_LEN(b));
@@ -213,7 +213,7 @@ static void test_allocation_failures(void) {
         fault_reset();
         fault_fail_after(k);
         failures = scenario();
-        CHECK(fault_outstanding() == 0);  /* no leak whichever allocation failed */
+        CHECK(fault_outstanding() == 0); /* no leak whichever allocation failed */
         CHECK(fake_open_iterators() == 0);
         if (failures != 0) {
             saw_failure = 1;
@@ -221,7 +221,7 @@ static void test_allocation_failures(void) {
             saw_success = 1;
         }
     }
-    CHECK(saw_failure && saw_success);   /* the injection really reached the code under test */
+    CHECK(saw_failure && saw_success); /* the injection really reached the code under test */
 }
 
 int main(void) {

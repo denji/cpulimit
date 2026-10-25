@@ -65,9 +65,9 @@
 struct bsd_rec {
     pid_t pid;
     pid_t ppid;
-    int64_t starttime;  /* microseconds since the epoch: constant for the life of a process */
-    int64_t cputime;    /* milliseconds */
-    int selected;       /* part of the answer for this filter */
+    int64_t starttime; /* microseconds since the epoch: constant for the life of a process */
+    int64_t cputime;   /* milliseconds */
+    int selected;      /* part of the answer for this filter */
     char comm[KI_MAXCOMLEN];
 };
 

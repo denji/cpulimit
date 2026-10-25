@@ -19,7 +19,11 @@
 
 #include "cli/cli.h"
 
-#define FAIL(msg) do { fprintf(stderr, "fuzz_cli: %s (line %d)\n", msg, __LINE__); abort(); } while (0)
+#define FAIL(msg)                                                                                                      \
+    do {                                                                                                               \
+        fprintf(stderr, "fuzz_cli: %s (line %d)\n", msg, __LINE__);                                                    \
+        abort();                                                                                                       \
+    } while (0)
 #define MAX_WORDS 32
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size);
@@ -74,8 +78,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         if (targets != 1) {
             FAIL("C1 not exactly one target");
         }
-        if (c1.limit_pct < 0 || c1.limit_pct > 100 * ncpu || c1.chunk_us < 1 ||
-            c1.chunk_us > CL_MAX_CHUNK_US || !(c1.min_cpu >= 0.0) || !isfinite(c1.min_cpu)) {
+        if (c1.limit_pct < 0 || c1.limit_pct > 100 * ncpu || c1.chunk_us < 1 || c1.chunk_us > CL_MAX_CHUNK_US ||
+            !(c1.min_cpu >= 0.0) || !isfinite(c1.min_cpu)) {
             FAIL("C2 value out of range");
         }
         if (c1.command_start != 0 && (c1.command_start < 1 || c1.command_start >= argc)) {

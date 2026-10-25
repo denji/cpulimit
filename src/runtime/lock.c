@@ -136,6 +136,6 @@ enum lock_result target_lock_acquire(pid_t pid, int64_t starttime, const char *r
 
 void target_lock_release(int fd) {
     if (fd >= 0) {
-        close(fd);  /* closing the descriptor releases the record lock */
+        close(fd); /* closing the descriptor releases the record lock */
     }
 }

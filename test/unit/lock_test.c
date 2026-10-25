@@ -38,7 +38,7 @@ static void path_in_base(char *out, size_t n, const char *name) {
 /* a child that takes the lock, reports, and holds it until told to leave */
 struct holder {
     pid_t pid;
-    int release_fd;  /* closing this lets the child exit */
+    int release_fd; /* closing this lets the child exit */
 };
 
 static struct holder start_holder(pid_t target, int64_t start, const char *dir) {
@@ -90,7 +90,7 @@ static void test_exclusive(void) {
     pid_t who = 0;
     h = start_holder(1234, 777, base);
     CHECK(target_lock_acquire(1234, 777, base, &fd, &who) == LOCK_BUSY);
-    CHECK(who == h.pid);                                              /* it tells who holds it */
+    CHECK(who == h.pid); /* it tells who holds it */
     CHECK(fd == -1);
     /* a different start time is a different process that merely reuses the pid */
     CHECK(target_lock_acquire(1234, 778, base, &fd, NULL) == LOCK_ACQUIRED);
@@ -108,7 +108,7 @@ static void test_killed_holder_releases(void) {
     int fd = -1, status;
     h = start_holder(4321, 5, base);
     CHECK(target_lock_acquire(4321, 5, base, &fd, NULL) == LOCK_BUSY);
-    kill(h.pid, SIGKILL);                       /* no cleanup code runs */
+    kill(h.pid, SIGKILL); /* no cleanup code runs */
     CHECK(waitpid(h.pid, &status, 0) == h.pid);
     close(h.release_fd);
     CHECK(target_lock_acquire(4321, 5, base, &fd, NULL) == LOCK_ACQUIRED);
@@ -122,7 +122,7 @@ static void test_release_and_reacquire(void) {
     target_lock_release(fd1);
     CHECK(target_lock_acquire(50, 1, base, &fd2, NULL) == LOCK_ACQUIRED);
     target_lock_release(fd2);
-    target_lock_release(-1);                    /* harmless */
+    target_lock_release(-1); /* harmless */
 }
 
 static void test_directory_hardening(void) {
@@ -169,7 +169,7 @@ static void test_directory_hardening(void) {
         FILE *f = fopen(target, "r");
         CHECK(f != NULL && fgets(buf, sizeof(buf), f) != NULL);
         fclose(f);
-        CHECK(strcmp(buf, "precious") == 0);                              /* untouched */
+        CHECK(strcmp(buf, "precious") == 0); /* untouched */
     }
 
     /* a path that cannot fit is an error, not a truncation */
@@ -197,7 +197,7 @@ static void test_default_directory(void) {
         snprintf(expect, sizeof(expect), "%s/cpulimit/31-2.lock", xdg);
         CHECK(access(expect, F_OK) == 0);
     }
-    CHECK(setenv("XDG_RUNTIME_DIR", "relative/path", 1) == 0);           /* ignored: must be absolute */
+    CHECK(setenv("XDG_RUNTIME_DIR", "relative/path", 1) == 0); /* ignored: must be absolute */
     CHECK(target_lock_acquire(32, 2, NULL, &fd, NULL) == LOCK_ACQUIRED);
     target_lock_release(fd);
     {

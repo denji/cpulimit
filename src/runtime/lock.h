@@ -27,8 +27,8 @@
 
 enum lock_result {
     LOCK_ACQUIRED = 0,
-    LOCK_BUSY,       /* another cpulimit holds the lock for this target */
-    LOCK_ERROR       /* the lock could not be set up (errno set); the caller decides whether to go on */
+    LOCK_BUSY, /* another cpulimit holds the lock for this target */
+    LOCK_ERROR /* the lock could not be set up (errno set); the caller decides whether to go on */
 };
 
 /*

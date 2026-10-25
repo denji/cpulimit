@@ -14,9 +14,15 @@
 
 #define MAXN 64
 
-struct item { int key; int pad; };
+struct item {
+    int key;
+    int pad;
+};
 
-struct model { struct item *e[MAXN]; int n; };
+struct model {
+    struct item *e[MAXN];
+    int n;
+};
 
 static void verify(struct list *l, const struct model *m) {
     struct list_node *n;
@@ -42,7 +48,12 @@ static void verify(struct list *l, const struct model *m) {
 }
 
 static uint32_t rng = 12345;
-TEST_PRNG static uint32_t next(void) { rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5; return rng; }
+TEST_PRNG static uint32_t next(void) {
+    rng ^= rng << 13;
+    rng ^= rng >> 17;
+    rng ^= rng << 5;
+    return rng;
+}
 
 static void test_random_operations(void) {
     struct list l;
@@ -52,7 +63,8 @@ static void test_random_operations(void) {
     init_list(&l, (int)sizeof(int));
     for (step = 0; step < 20000; step++) {
         switch (next() % 6) {
-        case 0: case 1: /* add */
+        case 0:
+        case 1: /* add */
             if (m.n < MAXN) {
                 struct item *it = malloc(sizeof(*it));
                 CHECK(it != NULL);
@@ -67,7 +79,8 @@ static void test_random_operations(void) {
                 int p = (int)(next() % (uint32_t)m.n);
                 struct list_node *n = l.first;
                 struct item *it = m.e[p];
-                for (i = 0; i < p; i++) n = n->next;
+                for (i = 0; i < p; i++)
+                    n = n->next;
                 delete_node(&l, n);
                 memmove(&m.e[p], &m.e[p + 1], (size_t)(m.n - p - 1) * sizeof(m.e[0]));
                 m.n--;
@@ -75,28 +88,32 @@ static void test_random_operations(void) {
             }
             break;
         case 3: /* locate by key: must find the FIRST element with that key */
-            {
-                int key = (int)(next() % 24), want = -1;
-                for (i = 0; i < m.n; i++) if (m.e[i]->key == key) { want = i; break; }
-                CHECK(locate_elem(&l, &key) == (want < 0 ? NULL : (void *)m.e[want]));
-                CHECK((locate_node(&l, &key) == NULL) == (want < 0));
-                if (want >= 0) CHECK(locate_node(&l, &key)->data == m.e[want]);
-            }
-            break;
+        {
+            int key = (int)(next() % 24), want = -1;
+            for (i = 0; i < m.n; i++)
+                if (m.e[i]->key == key) {
+                    want = i;
+                    break;
+                }
+            CHECK(locate_elem(&l, &key) == (want < 0 ? NULL : (void *)m.e[want]));
+            CHECK((locate_node(&l, &key) == NULL) == (want < 0));
+            if (want >= 0)
+                CHECK(locate_node(&l, &key)->data == m.e[want]);
+        } break;
         case 4: /* offset search on the second field */
-            {
-                int zero = 0;
-                CHECK(xlocate_elem(&l, &zero, (int)sizeof(int), (int)sizeof(int)) == (m.n ? (void *)m.e[0] : NULL));
-                zero = 7;
-                CHECK(xlocate_elem(&l, &zero, (int)sizeof(int), (int)sizeof(int)) == NULL);
-            }
-            break;
+        {
+            int zero = 0;
+            CHECK(xlocate_elem(&l, &zero, (int)sizeof(int), (int)sizeof(int)) == (m.n ? (void *)m.e[0] : NULL));
+            zero = 7;
+            CHECK(xlocate_elem(&l, &zero, (int)sizeof(int), (int)sizeof(int)) == NULL);
+        } break;
         default:
             break;
         }
         verify(&l, &m);
     }
-    for (i = 0; i < m.n; i++) free(m.e[i]);
+    for (i = 0; i < m.n; i++)
+        free(m.e[i]);
     clear_list(&l);
     CHECK(l.count == 0 && l.first == NULL && l.last == NULL);
     CHECK(fault_outstanding() == 0);
@@ -114,15 +131,15 @@ static void test_destroy_variants(void) {
         CHECK(add_elem(&l, v) != NULL);
     }
     CHECK(fault_outstanding() == 10);
-    n = l.first->next;                   /* destroy_node frees node AND element */
+    n = l.first->next; /* destroy_node frees node AND element */
     destroy_node(&l, n);
     CHECK(get_list_count(&l) == 4 && fault_outstanding() == 8);
     destroy_node(&l, l.first);
     destroy_node(&l, l.last);
     CHECK(get_list_count(&l) == 2 && fault_outstanding() == 4);
-    destroy_list(&l);                    /* and so does destroy_list */
+    destroy_list(&l); /* and so does destroy_list */
     CHECK(fault_outstanding() == 0 && is_empty_list(&l));
-    destroy_list(&l);                    /* idempotent on an empty list */
+    destroy_list(&l); /* idempotent on an empty list */
     clear_list(&l);
     CHECK(first_elem(&l) == NULL && last_elem(&l) == NULL && first_node(&l) == NULL && last_node(&l) == NULL);
     CHECK(locate_elem(&l, &i) == NULL);
@@ -138,13 +155,15 @@ static void test_single_element_and_ends(void) {
     CHECK(l.first == na && l.last == na && na->next == NULL && na->previous == NULL);
     delete_node(&l, na);
     CHECK(l.first == NULL && l.last == NULL && l.count == 0);
-    na = add_elem(&l, &a); nb = add_elem(&l, &b); nc = add_elem(&l, &c);
-    delete_node(&l, nb);                 /* middle */
+    na = add_elem(&l, &a);
+    nb = add_elem(&l, &b);
+    nc = add_elem(&l, &c);
+    delete_node(&l, nb); /* middle */
     CHECK(na->next == nc && nc->previous == na && l.count == 2);
-    delete_node(&l, nc);                 /* last */
+    delete_node(&l, nc); /* last */
     CHECK(l.last == na && na->next == NULL);
     nb = add_elem(&l, &b);
-    delete_node(&l, na);                 /* first */
+    delete_node(&l, na); /* first */
     CHECK(l.first == nb && nb->previous == NULL);
     clear_list(&l);
     CHECK(fault_outstanding() == 0);
@@ -157,7 +176,7 @@ static void test_allocation_failure(void) {
     fault_reset();
     init_list(&l, 4);
     CHECK(add_elem(&l, &a) != NULL);
-    for (n = 0; n < 1; n++) {            /* the only allocation add_elem makes */
+    for (n = 0; n < 1; n++) { /* the only allocation add_elem makes */
         fault_fail_after(n);
         CHECK(add_elem(&l, &b) == NULL);
         CHECK(l.count == 1 && l.first == l.last && l.first->data == &a && l.first->next == NULL);

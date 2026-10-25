@@ -78,7 +78,7 @@ int parse_proc_stat(const char *buf, struct proc_stat *out) {
         }
         len = (size_t)(p - start);
         if (len == 0) {
-            return -1;  /* fewer fields than expected */
+            return -1; /* fewer fields than expected */
         }
         switch (field) {
         case FIELD_STATE:
@@ -109,7 +109,7 @@ int parse_proc_stat(const char *buf, struct proc_stat *out) {
             }
             break;
         default:
-            break;  /* fields we do not use may hold anything, including negative numbers */
+            break; /* fields we do not use may hold anything, including negative numbers */
         }
     }
     *out = r;

@@ -16,7 +16,11 @@
 
 #include "platform/procfs_parse.h"
 
-#define FAIL(msg) do { fprintf(stderr, "fuzz_procfs_parse: %s (line %d)\n", msg, __LINE__); abort(); } while (0)
+#define FAIL(msg)                                                                                                      \
+    do {                                                                                                               \
+        fprintf(stderr, "fuzz_procfs_parse: %s (line %d)\n", msg, __LINE__);                                           \
+        abort();                                                                                                       \
+    } while (0)
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size);
 
@@ -53,11 +57,11 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         }
     } else {
         snprintf(line, sizeof(line),
-                 "1 (x) %c %ld 0 0 0 0 0 0 0 0 0 %" PRIu64 " %" PRIu64 " 0 0 0 0 0 0 %" PRIu64 " 0\n",
-                 a.state, (long)a.ppid, a.utime, a.stime, a.starttime);
+                 "1 (x) %c %ld 0 0 0 0 0 0 0 0 0 %" PRIu64 " %" PRIu64 " 0 0 0 0 0 0 %" PRIu64 " 0\n", a.state,
+                 (long)a.ppid, a.utime, a.stime, a.starttime);
         memset(&c, 0, sizeof(c));
-        if (parse_proc_stat(line, &c) != 0 || c.state != a.state || c.ppid != a.ppid ||
-            c.utime != a.utime || c.stime != a.stime || c.starttime != a.starttime) {
+        if (parse_proc_stat(line, &c) != 0 || c.state != a.state || c.ppid != a.ppid || c.utime != a.utime ||
+            c.stime != a.stime || c.starttime != a.starttime) {
             FAIL("P3 canonical re-parse differs");
         }
     }
@@ -65,7 +69,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     if (size >= 9) {
         uint64_t ticks;
         long tck = (long)(int8_t)data[8] * 25 + 1; /* includes <= 0 and ordinary values */
-        if (size >= 17) { /* ... or any value at all, to reach the overflow-avoiding branch */
+        if (size >= 17) {                          /* ... or any value at all, to reach the overflow-avoiding branch */
             uint64_t w;
             memcpy(&w, data + 9, sizeof(w));
             tck = (long)(w >> (data[8] & 63));

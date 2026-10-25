@@ -32,24 +32,23 @@
 
 //USER_HZ detection, from openssl code
 #ifndef HZ
-    #if defined(_SC_CLK_TCK) \
-        && (!defined(OPENSSL_SYS_VMS) || __CTRL_VER >= 70000000)
-        #define HZ ((double)sysconf(_SC_CLK_TCK))
-    #else
-        #ifndef CLK_TCK
-            #ifndef _BSD_CLK_TCK_ /* FreeBSD hack */
-                #define HZ  100.0
-            #else /* _BSD_CLK_TCK_ */
-                #define HZ ((double)_BSD_CLK_TCK_)
-            #endif
-        #else /* CLK_TCK */
-            #define HZ ((double)CLK_TCK)
-        #endif
-    #endif
+#if defined(_SC_CLK_TCK) && (!defined(OPENSSL_SYS_VMS) || __CTRL_VER >= 70000000)
+#define HZ ((double)sysconf(_SC_CLK_TCK))
+#else
+#ifndef CLK_TCK
+#ifndef _BSD_CLK_TCK_ /* FreeBSD hack */
+#define HZ 100.0
+#else /* _BSD_CLK_TCK_ */
+#define HZ ((double)_BSD_CLK_TCK_)
+#endif
+#else /* CLK_TCK */
+#define HZ ((double)CLK_TCK)
+#endif
+#endif
 #endif
 
 #ifdef __FreeBSD__
-    #include <kvm.h>
+#include <kvm.h>
 #endif
 
 // process descriptor
@@ -75,7 +74,7 @@ struct process {
     //owned by process_group (mark of the last update that saw this process)
     uint32_t group_seq;
     //path of the executable file (argv[0]); only filled when filter.need_command is set on Linux
-    char command[PATH_MAX+1];
+    char command[PATH_MAX + 1];
 };
 
 struct process_filter {

@@ -38,9 +38,9 @@
 struct apple_rec {
     pid_t pid;
     pid_t ppid;
-    int64_t starttime;  /* microseconds since the epoch: constant for the life of a process */
-    int64_t cputime;    /* milliseconds */
-    int selected;       /* part of the answer for this filter */
+    int64_t starttime; /* microseconds since the epoch: constant for the life of a process */
+    int64_t cputime;   /* milliseconds */
+    int selected;      /* part of the answer for this filter */
 };
 
 /* proc_pidinfo() reports CPU time in mach absolute time units: nanoseconds on Intel, but not on
@@ -62,7 +62,7 @@ static int read_rec(pid_t pid, struct apple_rec *r) {
     struct proc_taskallinfo ti;
     int bytes = proc_pidinfo(pid, PROC_PIDTASKALLINFO, 0, &ti, (int)sizeof(ti));
     if (bytes <= 0 || (size_t)bytes < sizeof(ti)) {
-        return -1;  /* ESRCH or EPERM: skip it quietly, as the Linux iterator does */
+        return -1; /* ESRCH or EPERM: skip it quietly, as the Linux iterator does */
     }
     if (ti.pbsd.pbi_status == SZOMB) {
         return -1;

@@ -117,7 +117,7 @@ int init_process_group(struct process_group *pgroup, int target_pid, int include
 int close_process_group(struct process_group *pgroup) {
     int i;
     int size = sizeof(pgroup->proctable) / sizeof(struct process *);
-    for (i=0; i<size; i++) {
+    for (i = 0; i < size; i++) {
         if (pgroup->proctable[i] != NULL) {
             //free() history for each process
             destroy_list(pgroup->proctable[i]);
@@ -270,7 +270,7 @@ int update_process_group_at(struct process_group *pgroup, int64_t now) {
                 p->cpu_usage = sample;
             } else {
                 //usage adjustment
-                p->cpu_usage = (1.0-ALFA) * p->cpu_usage + ALFA * sample;
+                p->cpu_usage = (1.0 - ALFA) * p->cpu_usage + ALFA * sample;
             }
             p->cputime = tmp_process.cputime;
         }
@@ -291,7 +291,7 @@ int remove_process(struct process_group *pgroup, int pid) {
     int hashkey = pid_hashfn(pid);
     struct process *p;
     if (pgroup->proctable[hashkey] == NULL) {
-        return 1;    //nothing to delete
+        return 1;  //nothing to delete
     }
     p = find_stored(pgroup->proctable[hashkey], (pid_t)pid);
     if (p == NULL) {

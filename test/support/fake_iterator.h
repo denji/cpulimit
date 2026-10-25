@@ -13,7 +13,7 @@ struct fake_proc {
     pid_t pid;
     pid_t ppid;
     int64_t starttime;
-    int64_t cputime;  /* milliseconds */
+    int64_t cputime; /* milliseconds */
 };
 
 /* what the next iteration (init_process_iterator ... close_process_iterator) will yield */

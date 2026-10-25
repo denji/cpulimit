@@ -62,7 +62,7 @@ static int read_process_info(pid_t pid, struct process *p) {
      *
      * In this case, we'll return -1 to the caller
      */
-    return psinfo.pr_nlwp?0:-1;
+    return psinfo.pr_nlwp ? 0 : -1;
 }
 
 static pid_t getppid_of(pid_t pid) {

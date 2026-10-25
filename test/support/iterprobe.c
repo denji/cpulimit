@@ -22,10 +22,9 @@ static int get(pid_t pid, struct kinfo_proc *kp) {
 }
 
 static void show(const char *tag, int i, const struct kinfo_proc *kp) {
-    printf("probe %s %2d stat=%d psflags=0x%x rtime=%u.%06u uticks=%llu sticks=%llu iticks=%llu\n",
-           tag, i, (int)kp->p_stat, (unsigned)kp->p_psflags, (unsigned)kp->p_rtime_sec,
-           (unsigned)kp->p_rtime_usec, (unsigned long long)kp->p_uticks,
-           (unsigned long long)kp->p_sticks, (unsigned long long)kp->p_iticks);
+    printf("probe %s %2d stat=%d psflags=0x%x rtime=%u.%06u uticks=%llu sticks=%llu iticks=%llu\n", tag, i,
+           (int)kp->p_stat, (unsigned)kp->p_psflags, (unsigned)kp->p_rtime_sec, (unsigned)kp->p_rtime_usec,
+           (unsigned long long)kp->p_uticks, (unsigned long long)kp->p_sticks, (unsigned long long)kp->p_iticks);
 }
 
 static void nap(long ms) {

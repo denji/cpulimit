@@ -24,7 +24,10 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size);
 #define MAX_LEN 512
 #define MAX_SEEDS 4096
 
-struct seed { uint8_t *data; size_t len; };
+struct seed {
+    uint8_t *data;
+    size_t len;
+};
 static struct seed seeds[MAX_SEEDS];
 static size_t nseeds;
 static uint8_t cur[MAX_LEN];
@@ -94,7 +97,9 @@ static void add_path(const char *path) {
     }
 }
 
-static void run(void) { LLVMFuzzerTestOneInput(cur, cur_len); }
+static void run(void) {
+    LLVMFuzzerTestOneInput(cur, cur_len);
+}
 
 static void mutate(void) {
     const struct seed *s = &seeds[rnd() % nseeds];
@@ -104,8 +109,14 @@ static void mutate(void) {
     while (rounds-- > 0) {
         size_t p = cur_len ? (size_t)(rnd() % cur_len) : 0;
         switch (rnd() % 7) {
-        case 0: if (cur_len) cur[p] ^= (uint8_t)(1u << (rnd() % 8)); break;
-        case 1: if (cur_len) cur[p] = (uint8_t)rnd(); break;
+        case 0:
+            if (cur_len)
+                cur[p] ^= (uint8_t)(1u << (rnd() % 8));
+            break;
+        case 1:
+            if (cur_len)
+                cur[p] = (uint8_t)rnd();
+            break;
         case 2: /* insert */
             if (cur_len < MAX_LEN) {
                 memmove(cur + p + 1, cur + p, cur_len - p);
@@ -128,7 +139,8 @@ static void mutate(void) {
         case 5: /* duplicate a block */
             if (cur_len) {
                 size_t l = 1 + (size_t)(rnd() % 8), q = (size_t)(rnd() % cur_len);
-                if (q + l > cur_len) l = cur_len - q;
+                if (q + l > cur_len)
+                    l = cur_len - q;
                 if (cur_len + l <= MAX_LEN) {
                     memmove(cur + q + l, cur + q, cur_len - q);
                     memcpy(cur + q, cur + q + l, l); /* the moved block, so q..q+l is a copy */
@@ -141,7 +153,8 @@ static void mutate(void) {
             size_t keep = cur_len ? (size_t)(rnd() % (cur_len + 1)) : 0;
             size_t from = o->len ? (size_t)(rnd() % o->len) : 0;
             size_t l = o->len - from;
-            if (keep + l > MAX_LEN) l = MAX_LEN - keep;
+            if (keep + l > MAX_LEN)
+                l = MAX_LEN - keep;
             memcpy(cur + keep, o->data + from, l);
             cur_len = keep + l;
         }
@@ -167,7 +180,8 @@ int main(int argc, char **argv) {
     if (nseeds == 0) {
         seeds[0].data = calloc(1, MAX_LEN);
         nseeds = seeds[0].data ? 1 : 0;
-        if (nseeds == 0) return 2;
+        if (nseeds == 0)
+            return 2;
     }
     for (i = 0; i < nseeds; i++) {
         snprintf(crash_name, sizeof(crash_name), "crash-seed-%lu", i);
@@ -180,7 +194,7 @@ int main(int argc, char **argv) {
         mutate();
         run();
     }
-    printf("%zu seed(s) + %lu mutation(s), seed %llu: no property violated\n",
-           nseeds, iterations, (unsigned long long)seed);
+    printf("%zu seed(s) + %lu mutation(s), seed %llu: no property violated\n", nseeds, iterations,
+           (unsigned long long)seed);
     return 0;
 }

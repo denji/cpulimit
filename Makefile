@@ -58,7 +58,7 @@ MAIN_OBJ   := $(BUILD)/main.o
 UNIT_TESTS := process_iterator_test util_test limiter_test procfs_parse_test group_test list_test cli_parse_test lock_test
 TEST_BINS  := $(addprefix $(BUILD)/test/,$(UNIT_TESTS) busy spawn)
 
-.PHONY: analyze verif-sim verif-cbmc stress bench fuzz-standalone fuzz-libfuzzer coverage all check test man install uninstall static static-install static_install \
+.PHONY: format format-check format format-check analyze verif-sim verif-cbmc stress bench fuzz-standalone fuzz-libfuzzer coverage all check test man install uninstall static static-install static_install \
         strip clean distclean FORCE
 
 all: $(BIN)
@@ -172,6 +172,12 @@ fuzz-libfuzzer:
 	    -o $(BUILD)/fuzz/fuzz_cli $(FUZZ_DIR)/fuzz_cli.c $(FUZZ_SRC_cli) -lm
 
 # ---- load, memory and benchmark ---------------------------------------------------------------
+format:
+	sh .format.sh
+
+format-check:
+	sh .format.sh --check
+
 stress: all $(BUILD)/test/busy
 	BUILD=$(BUILD) sh $(TESTDIR)/integration/stress_test.sh
 

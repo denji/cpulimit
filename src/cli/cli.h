@@ -29,31 +29,31 @@
 
 struct cli_config {
     /* target: exactly one of these is set */
-    int pid;                 /* -p */
+    int pid; /* -p */
     int pid_set;
-    const char *exe;         /* -e */
+    const char *exe; /* -e */
     int exe_set;
-    int command_start;       /* index of the first word of the command in argv, or 0 */
+    int command_start; /* index of the first word of the command in argv, or 0 */
     /* limits */
-    int limit_pct;           /* -l, percent of one CPU */
-    int chunk_us;            /* -c */
-    double min_cpu;          /* -m, fraction of a CPU below which a process is left running */
-    int include_children;    /* -i */
-    int lazy;                /* -z (implied by -p) */
+    int limit_pct;        /* -l, percent of one CPU */
+    int chunk_us;         /* -c */
+    double min_cpu;       /* -m, fraction of a CPU below which a process is left running */
+    int include_children; /* -i */
+    int lazy;             /* -z (implied by -p) */
     /* operation */
-    int verbose;             /* -v */
-    int daemonize;           /* -d */
-    int use_syslog;          /* -s */
-    const char *pidfile;     /* -P */
-    int no_lock;             /* --no-lock */
-    int no_boost;            /* --no-boost */
+    int verbose;         /* -v */
+    int daemonize;       /* -d */
+    int use_syslog;      /* -s */
+    const char *pidfile; /* -P */
+    int no_lock;         /* --no-lock */
+    int no_boost;        /* --no-boost */
 };
 
 enum cli_result {
     CLI_OK = 0,
-    CLI_USAGE,    /* an error message was written to err; the caller prints usage to stderr, exit 1 */
-    CLI_HELP,     /* -h: the caller prints usage to stdout, exit 1 (as always) */
-    CLI_VERSION   /* -V: the caller prints the version, exit 0 */
+    CLI_USAGE,  /* an error message was written to err; the caller prints usage to stderr, exit 1 */
+    CLI_HELP,   /* -h: the caller prints usage to stdout, exit 1 (as always) */
+    CLI_VERSION /* -V: the caller prints the version, exit 0 */
 };
 
 /*

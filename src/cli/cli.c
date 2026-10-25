@@ -39,13 +39,15 @@ const char *cli_version(void) {
 void cli_usage(FILE *stream, const char *program_name, int ncpu) {
     fprintf(stream, "Usage: %s [OPTIONS...] TARGET\n", program_name);
     fprintf(stream, "   OPTIONS\n");
-    fprintf(stream, "      -l, --limit=N                percentage of cpu allowed from 0 to %d (required)\n", 100*ncpu);
+    fprintf(stream, "      -l, --limit=N                percentage of cpu allowed from 0 to %d (required)\n",
+            100 * ncpu);
     fprintf(stream, "      -c, --chunk-size=N           enforce CPU limit in N microsecond chunks\n");
     fprintf(stream, "      -v, --verbose                show control statistics\n");
     fprintf(stream, "      -V, --version                show program version number\n");
     fprintf(stream, "      -z, --lazy                   exit if there is no target process, or if it dies\n");
     fprintf(stream, "      -i, --include-children       limit also the children processes\n");
-    fprintf(stream, "      -m, --minimum-limited-cpu=M  processes using less than M of a CPU (0.05 = 5%%) are left running\n");
+    fprintf(stream,
+            "      -m, --minimum-limited-cpu=M  processes using less than M of a CPU (0.05 = 5%%) are left running\n");
     fprintf(stream, "      -d, --daemon                 detach from the terminal and run in the background\n");
     fprintf(stream, "      -s, --syslog                 also log events to syslog\n");
     fprintf(stream, "      -P, --pidfile=FILE           write the daemon's pid to FILE (requires --daemon)\n");
@@ -69,24 +71,22 @@ enum cli_result cli_parse(int argc, char **argv, int ncpu, long pid_max, struct 
      * command's own options are never interpreted) */
     static const char short_options[] = "+p:e:l:c:vVzim:hdsP:";
     /* An array describing valid long options */
-    static const struct option long_options[] = {
-        { "pid",        required_argument,     NULL, 'p' },
-        { "exe",        required_argument,     NULL, 'e' },
-        { "limit",      required_argument,     NULL, 'l' },
-        { "chunk-size", required_argument,     NULL, 'c' },
-        { "verbose",    no_argument,           NULL, 'v' },
-        { "version",    no_argument,           NULL, 'V' },
-        { "lazy",       no_argument,           NULL, 'z' },
-        { "include-children", no_argument,     NULL, 'i' },
-        { "minimum-limited-cpu", required_argument, NULL, 'm' },
-        { "daemon",     no_argument,           NULL, 'd' },
-        { "syslog",     no_argument,           NULL, 's' },
-        { "pidfile",    required_argument,     NULL, 'P' },
-        { "no-lock",    no_argument,           NULL, OPT_NO_LOCK },
-        { "no-boost",   no_argument,           NULL, OPT_NO_BOOST },
-        { "help",       no_argument,           NULL, 'h' },
-        { 0,            0,                     0,     0  }
-    };
+    static const struct option long_options[] = { { "pid", required_argument, NULL, 'p' },
+                                                  { "exe", required_argument, NULL, 'e' },
+                                                  { "limit", required_argument, NULL, 'l' },
+                                                  { "chunk-size", required_argument, NULL, 'c' },
+                                                  { "verbose", no_argument, NULL, 'v' },
+                                                  { "version", no_argument, NULL, 'V' },
+                                                  { "lazy", no_argument, NULL, 'z' },
+                                                  { "include-children", no_argument, NULL, 'i' },
+                                                  { "minimum-limited-cpu", required_argument, NULL, 'm' },
+                                                  { "daemon", no_argument, NULL, 'd' },
+                                                  { "syslog", no_argument, NULL, 's' },
+                                                  { "pidfile", required_argument, NULL, 'P' },
+                                                  { "no-lock", no_argument, NULL, OPT_NO_LOCK },
+                                                  { "no-boost", no_argument, NULL, OPT_NO_BOOST },
+                                                  { "help", no_argument, NULL, 'h' },
+                                                  { 0, 0, 0, 0 } };
     int limit_ok = 0;
     int next_option;
     int option_index = 0;
@@ -96,15 +96,15 @@ enum cli_result cli_parse(int argc, char **argv, int ncpu, long pid_max, struct 
     memset(cfg, 0, sizeof(*cfg));
     cfg->chunk_us = CL_DEFAULT_CHUNK_US;
     if (ncpu < 1) {
-        ncpu = 1;  /* the count is unknown: assume one, a limit above it is meaningless */
+        ncpu = 1; /* the count is unknown: assume one, a limit above it is meaningless */
     }
 
     /* getopt keeps its position in globals: reset so the function can be called again */
 #if defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__)
-    optreset = 1;  /* BSD libc: optind alone does not restart the scan */
+    optreset = 1; /* BSD libc: optind alone does not restart the scan */
     optind = 1;
 #else
-    optind = 0;    /* glibc and musl: 0 re-initialises all internal getopt state */
+    optind = 0; /* glibc and musl: 0 re-initialises all internal getopt state */
 #endif
     /* getopt writes its own messages ("invalid option -- 'x'") to the real stderr, exactly as
      * the program always did; for any other stream (tests, fuzzing) we write the message */
@@ -201,7 +201,7 @@ enum cli_result cli_parse(int argc, char **argv, int ncpu, long pid_max, struct 
 
     if (optind < argc) {
         cfg->command_start = optind;
-        cfg->lazy = 1;  /* "COMMAND [ARGS]: run this command and limit it (implies -z)" */
+        cfg->lazy = 1; /* "COMMAND [ARGS]: run this command and limit it (implies -z)" */
     }
     target_count = cfg->exe_set + cfg->pid_set + (cfg->command_start != 0);
     if (target_count == 0) {

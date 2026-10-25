@@ -56,7 +56,8 @@ static void one(void)
 #ifndef VERIF_CBMC
 int main(int argc, char **argv) {
     long n = argc > 1 ? atol(argv[1]) : 2000000, i;
-    for (i = 0; i < n; i++) one();
+    for (i = 0; i < n; i++)
+        one();
     printf("verify_ticks: %ld samples, no property violated\n", n);
     return 0;
 }

@@ -22,7 +22,7 @@ static void one(void)
 #endif
 {
     char buf[48];
-    unsigned char digit[23];   /* digit[k] is the value of field k, 4 <= k <= 22 */
+    unsigned char digit[23]; /* digit[k] is the value of field k, 4 <= k <= 22 */
     char name;
     unsigned char state;
     struct proc_stat out;
@@ -60,7 +60,8 @@ static void one(void)
 #ifndef VERIF_CBMC
 int main(int argc, char **argv) {
     long n = argc > 1 ? atol(argv[1]) : 2000000, i;
-    for (i = 0; i < n; i++) one();
+    for (i = 0; i < n; i++)
+        one();
     printf("verify_parse_stat_line: %ld samples, no property violated\n", n);
     return 0;
 }

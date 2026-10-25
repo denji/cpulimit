@@ -27,7 +27,7 @@ static void test_parse_long_rejects(void) {
         errno = 0;
         CHECK(parse_long(bad[i], -1000, 1000, &v) == -1);
         CHECK(errno == EINVAL);
-        CHECK(v == 1234);  /* untouched on failure */
+        CHECK(v == 1234); /* untouched on failure */
     }
     errno = 0;
     CHECK(parse_long(NULL, 0, 10, &v) == -1 && errno == EINVAL);
@@ -44,7 +44,9 @@ static void test_parse_long_rejects(void) {
 
 static void test_parse_double(void) {
     double v = -1;
-    static const char *bad[] = { "", " 1", "1 ", "1.5abc", "abc", "nan", "NaN", "inf", "-inf", "infinity", "1e999", NULL };
+    static const char *bad[] = {
+        "", " 1", "1 ", "1.5abc", "abc", "nan", "NaN", "inf", "-inf", "infinity", "1e999", NULL
+    };
     int i;
     CHECK(parse_double("0", 0, 10, &v) == 0 && v == 0);
     CHECK(parse_double("0.25", 0, 10, &v) == 0 && v == 0.25);
@@ -88,7 +90,7 @@ static void test_sleep_and_clock(void) {
     CHECK(sleep_ns(-100) == 0);
     t0 = now_ns();
     CHECK(t0 > 0);
-    CHECK(sleep_ns(5000000) == 0);  /* 5 ms */
+    CHECK(sleep_ns(5000000) == 0); /* 5 ms */
     t1 = now_ns();
     CHECK(t1 - t0 >= 5000000);
     CHECK(t1 >= t0);

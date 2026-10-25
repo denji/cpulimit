@@ -36,7 +36,7 @@ int init_process_iterator(struct process_iterator *it, struct process_filter *fi
     /* Get the list of processes. */
     if ((it->procs = kvm_getprocs(it->kd, KERN_PROC_PROC, 0, &it->count)) == NULL) {
         kvm_close(it->kd);
-//		fprintf(stderr, "kvm_getprocs: %s\n", kvm_geterr(it->kd));
+        //		fprintf(stderr, "kvm_getprocs: %s\n", kvm_geterr(it->kd));
         return -1;
     }
     it->filter = filter;
@@ -60,7 +60,7 @@ static int get_single_process(kvm_t *kd, pid_t pid, struct process *process) {
     int count;
     struct kinfo_proc *kproc = kvm_getprocs(kd, KERN_PROC_PID, pid, &count);
     if (count == 0 || kproc == NULL) {
-//		fprintf(stderr, "kvm_getprocs: %s\n", kvm_geterr(kd));
+        //		fprintf(stderr, "kvm_getprocs: %s\n", kvm_geterr(kd));
         return -1;
     }
     kproc2proc(kd, kproc, process);
@@ -109,4 +109,3 @@ int close_process_iterator(struct process_iterator *it) {
     }
     return 0;
 }
-

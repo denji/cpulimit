@@ -24,10 +24,10 @@
 #include <stdlib.h>
 #include <string.h>
 #ifdef __sun__
-    #include <procfs.h>
+#include <procfs.h>
 #elif !defined __APPLE__ && !defined __OpenBSD__
-    #include <unistd.h>
-    #include <sys/procfs.h>
+#include <unistd.h>
+#include <sys/procfs.h>
 #endif
 #include <time.h>
 #include "platform/iterator.h"
@@ -36,26 +36,26 @@
 
 #ifdef __linux__
 
-    #include "linux/iterator.c"
+#include "linux/iterator.c"
 
 #elif defined __FreeBSD__
 
-    #include "freebsd/iterator.c"
+#include "freebsd/iterator.c"
 
 #elif defined __APPLE__
 
-    #include "macos/iterator.c"
+#include "macos/iterator.c"
 
 #elif defined __OpenBSD__
 
-    #include "openbsd/iterator.c"
+#include "openbsd/iterator.c"
 
 #elif defined __sun__
 
-    #include "solaris/iterator.c"
+#include "solaris/iterator.c"
 
 #else
 
-    #error Platform not supported
+#error Platform not supported
 
 #endif

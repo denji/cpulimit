@@ -14,9 +14,10 @@
 #include <unistd.h>
 
 static int signal_number(const char *name) {
-    static const struct { const char *name; int sig; } table[] = {
-        { "HUP", SIGHUP }, { "INT", SIGINT }, { "QUIT", SIGQUIT }, { "TERM", SIGTERM }, { "PIPE", SIGPIPE }
-    };
+    static const struct {
+        const char *name;
+        int sig;
+    } table[] = { { "HUP", SIGHUP }, { "INT", SIGINT }, { "QUIT", SIGQUIT }, { "TERM", SIGTERM }, { "PIPE", SIGPIPE } };
     size_t i;
     for (i = 0; i < sizeof(table) / sizeof(table[0]); i++) {
         if (strcmp(name, table[i].name) == 0) {

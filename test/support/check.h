@@ -13,12 +13,12 @@
 #include <sys/prctl.h>
 #endif
 
-#define CHECK(cond) \
-    do { \
-        if (!(cond)) { \
-            fprintf(stderr, "%s:%d: CHECK failed: %s\n", __FILE__, __LINE__, #cond); \
-            exit(1); \
-        } \
+#define CHECK(cond)                                                                                                    \
+    do {                                                                                                               \
+        if (!(cond)) {                                                                                                 \
+            fprintf(stderr, "%s:%d: CHECK failed: %s\n", __FILE__, __LINE__, #cond);                                   \
+            exit(1);                                                                                                   \
+        }                                                                                                              \
     } while (0)
 
 /* A failed CHECK calls exit(), which must never leave a busy or sleeping child behind: an orphan
@@ -39,10 +39,10 @@ static pid_t test_owner;
 static inline void test_kill_kids(void) {
     int i;
     if (getpid() != test_owner) {
-        return;  /* a forked child that calls exit() must not kill its siblings */
+        return; /* a forked child that calls exit() must not kill its siblings */
     }
     for (i = 0; i < test_nkids; i++) {
-        kill(-test_kids[i], SIGKILL);  /* the whole group, when the child leads one */
+        kill(-test_kids[i], SIGKILL); /* the whole group, when the child leads one */
         kill(test_kids[i], SIGKILL);
     }
 }

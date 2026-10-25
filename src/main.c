@@ -121,7 +121,7 @@ static void release_all(struct process_group *pg) {
 }
 
 //return t1-t2 in microseconds (no overflow checks, so better watch out!)
-static inline unsigned long timediff(const struct timeval *t1,const struct timeval *t2) {
+static inline unsigned long timediff(const struct timeval *t1, const struct timeval *t2) {
     return (t1->tv_sec - t2->tv_sec) * 1000000 + (t1->tv_usec - t2->tv_usec);
 }
 
@@ -134,7 +134,7 @@ static void increase_priority(void) {
     //find the best available nice value
     int old_priority = getpriority(PRIO_PROCESS, 0);
     int priority = old_priority;
-    while (priority > MAX_PRIORITY && setpriority(PRIO_PROCESS, 0, priority-1) == 0) {
+    while (priority > MAX_PRIORITY && setpriority(PRIO_PROCESS, 0, priority - 1) == 0) {
         priority--;
     }
     if (priority != old_priority) {
@@ -200,7 +200,8 @@ static int64_t starttime_of(pid_t pid) {
 
 enum limit_end { LIMIT_TARGET_GONE, LIMIT_SIGNALLED, LIMIT_FAILED };
 
-static enum limit_end limit_process(pid_t pid, double limit, int include_children, double minimum_cpu_usage, int chunk_size) {
+static enum limit_end limit_process(pid_t pid, double limit, int include_children, double minimum_cpu_usage,
+                                    int chunk_size) {
     //slices of the slot: in which the process is allowed to run / is stopped
     struct slices slice;
     //when the last work slice has started
@@ -231,7 +232,8 @@ static enum limit_end limit_process(pid_t pid, double limit, int include_childre
     }
 
     if (verbose) {
-        report(LOG_INFO, stdout, "Members in the process group owned by %d: %d\n", pgroup.target_pid, pgroup.proclist->count);
+        report(LOG_INFO, stdout, "Members in the process group owned by %d: %d\n", pgroup.target_pid,
+               pgroup.proclist->count);
     }
 
     //rate at which we are keeping active the processes (range 0-1)
@@ -248,7 +250,7 @@ static enum limit_end limit_process(pid_t pid, double limit, int include_childre
             break;
         }
 
-        if (pgroup.proclist->count==0) {
+        if (pgroup.proclist->count == 0) {
             if (verbose) {
                 report(LOG_INFO, stdout, "No more processes.\n");
             }
@@ -279,11 +281,12 @@ static enum limit_end limit_process(pid_t pid, double limit, int include_childre
         }
 
         if (verbose) {
-            if (c%200==0) {
+            if (c % 200 == 0) {
                 printf("\n%%CPU\twork quantum\tsleep quantum\tactive rate\n");
             }
-            if (c%10==0 && c>0) {
-                printf("%0.2lf%%\t%6ld us\t%6ld us\t%0.2lf%%\n", pcpu*100, (long)(slice.work_ns/1000), (long)(slice.stop_ns/1000), workingrate*100);
+            if (c % 10 == 0 && c > 0) {
+                printf("%0.2lf%%\t%6ld us\t%6ld us\t%0.2lf%%\n", pcpu * 100, (long)(slice.work_ns / 1000),
+                       (long)(slice.stop_ns / 1000), workingrate * 100);
             }
         }
 
@@ -292,7 +295,7 @@ static enum limit_end limit_process(pid_t pid, double limit, int include_childre
         while (node != NULL) {
             struct list_node *next_node = node->next;
             struct process *proc = (struct process *)(node->data);
-            if (kill(proc->pid,SIGCONT) != 0) {
+            if (kill(proc->pid, SIGCONT) != 0) {
                 //process is dead, remove it from family
                 if (verbose) {
                     fprintf(stderr, "SIGCONT failed. Process %d dead!\n", proc->pid);
@@ -309,8 +312,8 @@ static enum limit_end limit_process(pid_t pid, double limit, int include_childre
         gettimeofday(&endwork, NULL);
         workingtime = timediff(&endwork, &startwork);
 
-        long delay = workingtime - slice.work_ns/1000;
-        if (c>0 && delay>10000) {
+        long delay = workingtime - slice.work_ns / 1000;
+        if (c > 0 && delay > 10000) {
             //delay is too much! signal to user?
             //fprintf(stderr, "%d %ld us\n", c, delay);
         }
@@ -319,13 +322,13 @@ static enum limit_end limit_process(pid_t pid, double limit, int include_childre
             break;
         }
 
-        if (slice.stop_ns>0) {
+        if (slice.stop_ns > 0) {
             //stop processes only if the stop slice is not empty
             node = pgroup.proclist->first;
             while (node != NULL) {
                 struct list_node *next_node = node->next;
                 struct process *proc = (struct process *)(node->data);
-                if (proc->cpu_usage > minimum_cpu_usage && kill(proc->pid,SIGSTOP)!=0) {
+                if (proc->cpu_usage > minimum_cpu_usage && kill(proc->pid, SIGSTOP) != 0) {
                     //process is dead, remove it from family
                     if (verbose) {
                         fprintf(stderr, "SIGSTOP failed. Process %d dead!\n", proc->pid);
@@ -372,17 +375,17 @@ static void run_command(const struct cli_config *cfg, char **argv, int argc, dou
     const char *cmd = argv[cfg->command_start];
     //command line arguments
     char **cmd_args = (char **)malloc((argc - cfg->command_start + 1) * sizeof(char *));
-    if (cmd_args==NULL) {
+    if (cmd_args == NULL) {
         exit(2);
     }
-    for (i=0; i<argc-cfg->command_start; i++) {
-        cmd_args[i] = argv[i+cfg->command_start];
+    for (i = 0; i < argc - cfg->command_start; i++) {
+        cmd_args[i] = argv[i + cfg->command_start];
     }
     cmd_args[i] = NULL;
 
     if (verbose) {
         printf("Running command: '%s", cmd);
-        for (i=1; i<argc-cfg->command_start; i++) {
+        for (i = 1; i < argc - cfg->command_start; i++) {
             printf(" %s", cmd_args[i]);
         }
         printf("'\n");
@@ -407,7 +410,7 @@ static void run_command(const struct cli_config *cfg, char **argv, int argc, dou
     //parent code: it is the limiter, and the target is its child, so it learns how the target
     //ended from waitpid() and there is no second process that could be left behind
     if (verbose) {
-        report(LOG_INFO, stdout, "Limiting process %d\n",child);
+        report(LOG_INFO, stdout, "Limiting process %d\n", child);
     }
     enum limit_end end = limit_process(child, limit, cfg->include_children, cfg->min_cpu, cfg->chunk_us);
     if (end == LIMIT_SIGNALLED) {
@@ -526,7 +529,8 @@ int main(int argc, char **argv) {
         }
         if (ret > 0) {
             if (ret == cpulimit_pid) {
-                report(LOG_ERR, stdout, "Target process %d is cpulimit itself! Aborting because it makes no sense\n", ret);
+                report(LOG_ERR, stdout, "Target process %d is cpulimit itself! Aborting because it makes no sense\n",
+                       ret);
                 exit(1);
             }
             //one limiter per target: two would undo each other's SIGSTOP/SIGCONT
@@ -538,10 +542,14 @@ int main(int argc, char **argv) {
                     case LOCK_ACQUIRED:
                         break;
                     case LOCK_BUSY:
-                        report(LOG_ERR, stderr, "Error: process %d is already being limited by another cpulimit (pid %d); use --no-lock to override\n", pid, (int)holder);
+                        report(LOG_ERR, stderr,
+                               "Error: process %d is already being limited by another cpulimit (pid %d); use --no-lock "
+                               "to override\n",
+                               pid, (int)holder);
                         exit(1);
                     case LOCK_ERROR:
-                        report(LOG_WARNING, stderr, "Warning: cannot create the lock file (%s); going on without it\n", strerror(errno));
+                        report(LOG_WARNING, stderr, "Warning: cannot create the lock file (%s); going on without it\n",
+                               strerror(errno));
                         lock_fd = -1;
                         break;
                     }

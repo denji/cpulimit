@@ -1,0 +1,25 @@
+# Formatting only; the lint checks are in .clang-tidy. Run `make format` to rewrite files and
+# `make format-check` to verify (CI uses clang-format 18, the version in Ubuntu 24.04: the output
+# differs between major versions, so pin it before changing anything here).
+#
+# Chosen to match the code as it was written (4 spaces, K&R braces, `char *p`, long lines kept up
+# to 120 columns, comments left alone) so that the first run changed spacing and wrapping only.
+BasedOnStyle: LLVM
+IndentWidth: 4
+ContinuationIndentWidth: 4
+ColumnLimit: 120
+UseTab: Never
+BreakBeforeBraces: Attach
+PointerAlignment: Right
+IndentCaseLabels: false
+IndentPPDirectives: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortBlocksOnASingleLine: Never
+AllowShortCaseLabelsOnASingleLine: false
+Cpp11BracedListStyle: false
+SpacesBeforeTrailingComments: 2
+ReflowComments: false
+# include order matters here (feature macros, then platform headers): never reorder
+SortIncludes: Never

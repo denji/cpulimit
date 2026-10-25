@@ -27,11 +27,11 @@
 
 /* The fields of /proc/<pid>/stat that cpulimit uses. Times are in clock ticks. */
 struct proc_stat {
-    char state;          /* field 3: R, S, D, Z, T, ... */
-    pid_t ppid;          /* field 4 */
-    uint64_t utime;      /* field 14 */
-    uint64_t stime;      /* field 15 */
-    uint64_t starttime;  /* field 22: ticks since boot, constant for the life of a process */
+    char state;         /* field 3: R, S, D, Z, T, ... */
+    pid_t ppid;         /* field 4 */
+    uint64_t utime;     /* field 14 */
+    uint64_t stime;     /* field 15 */
+    uint64_t starttime; /* field 22: ticks since boot, constant for the life of a process */
 };
 
 /*

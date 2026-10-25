@@ -13,8 +13,8 @@
 /* The controller arithmetic exactly as it was in limit_process() before it was
  * extracted. Used as a regression oracle on the domain where the old code was
  * well defined (limit <= 1, work slice < 1 s). */
-static void old_slices(double limit, double pcpu, double workingrate, int chunk_size,
-                       long *twork_ns, long *tsleep_ns, double *rate_out) {
+static void old_slices(double limit, double pcpu, double workingrate, int chunk_size, long *twork_ns, long *tsleep_ns,
+                       double *rate_out) {
     if (pcpu < 0) {
         pcpu = limit;
         workingrate = limit;
@@ -116,7 +116,7 @@ static void test_matches_old_formula(void) {
                     long ow, os;
                     double orate;
                     if (CHUNKS[d] >= 1000000) {
-                        continue;  /* old code: tv_nsec == 1e9, rejected by nanosleep() */
+                        continue; /* old code: tv_nsec == 1e9, rejected by nanosleep() */
                     }
                     if (PCPUS[b] >= 0 && PCPUS[b] < 1e-300) {
                         /* idle (0) or denormal usage: the old formula divided by zero or

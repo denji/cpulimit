@@ -4,7 +4,7 @@
 
 #include "support/fault_alloc.h"
 
-static long countdown = -1;  /* < 0: never fail */
+static long countdown = -1; /* < 0: never fail */
 static long outstanding = 0;
 static long total = 0;
 
@@ -38,7 +38,7 @@ void *fault_realloc(void *p, size_t n) {
         return fault_malloc(n);
     }
     if (should_fail()) {
-        return NULL;  /* the original block stays valid, as with the real realloc() */
+        return NULL; /* the original block stays valid, as with the real realloc() */
     }
     q = realloc(p, n);
     return q;

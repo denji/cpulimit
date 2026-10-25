@@ -81,6 +81,15 @@ jobs:
           make clean
           scan-build --status-bugs -disable-checker security.insecureAPI.DeprecatedOrUnsafeBufferHandling make all
 
+  # clang-format output differs between major versions: pinned to 18, the one in Ubuntu 24.04
+  format:
+    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y clang-format-18
+      - run: bash tools/ci_run.sh "format" env CLANG_FORMAT=clang-format-18 sh .format.sh --check
+
   codeql:
     timeout-minutes: 30
     runs-on: ubuntu-24.04

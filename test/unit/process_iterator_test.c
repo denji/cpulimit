@@ -32,10 +32,10 @@
 #include <string.h>
 
 #if defined(__APPLE__) || defined(__FreeBSD__)
-    #include <libgen.h>
+#include <libgen.h>
 #endif
 #ifdef __linux__
-    #include <sys/prctl.h>
+#include <sys/prctl.h>
 #endif
 
 #include <platform/iterator.h>
@@ -160,10 +160,10 @@ void test_process_group_all() {
     int count = 0;
     CHECK(init_process_group(&pgroup, 0, 0) == 0);
     CHECK(update_process_group(&pgroup) == 0);
-    for (node=pgroup.proclist->first; node!= NULL; node=node->next) {
+    for (node = pgroup.proclist->first; node != NULL; node = node->next) {
         count++;
     }
-    CHECK(count >= 1);  /* see test_all_processes: no assumption about how many others exist */
+    CHECK(count >= 1); /* see test_all_processes: no assumption about how many others exist */
     CHECK(update_process_group(&pgroup) == 0);
     CHECK(close_process_group(&pgroup) == 0);
 }
@@ -191,18 +191,19 @@ void test_process_group_single(int include_children) {
     if (child == 0) {
         TEST_DIE_WITH_PARENT();
         //child is supposed to be killed by the parent :/
-        while (1);
+        while (1)
+            ;
     }
     test_track_child(child);
     signal(SIGABRT, &kill_child);
     signal(SIGTERM, &kill_child);
     CHECK(init_process_group(&pgroup, child, include_children) == 0);
-    for (i=0; i<100; i++) {
+    for (i = 0; i < 100; i++) {
         struct list_node *node = NULL;
         struct timespec interval;
         int count = 0;
         CHECK(update_process_group(&pgroup) == 0);
-        for (node=pgroup.proclist->first; node!= NULL; node=node->next) {
+        for (node = pgroup.proclist->first; node != NULL; node = node->next) {
             struct process *p = (struct process *)(node->data);
             CHECK(p->pid == child);
             CHECK(p->ppid == getpid());
@@ -413,7 +414,9 @@ static int cmdline_starts_with(pid_t pid, const char *argv0) {
     }
     buf[n] = '\0';
     if (strcmp(buf, argv0) != 0) {
-        fprintf(stderr, "note: another process's cmdline starts with '%s', not '%s' (emulator?): find-by-name tests skipped\n", buf, argv0);
+        fprintf(stderr,
+                "note: another process's cmdline starts with '%s', not '%s' (emulator?): find-by-name tests skipped\n",
+                buf, argv0);
         return 0;
     }
 #else
@@ -441,7 +444,7 @@ void test_find_by_name(const char *argv0) {
         return;
     }
     found = find_process_by_name(base_name(argv0));
-    CHECK(found > 0);                 //this very program matches
+    CHECK(found > 0);  //this very program matches
     {
         //by path, when given one. The documented form is an absolute path: Linux reports the
         //command as it was typed, macOS and the BSDs report the resolved path of the executable

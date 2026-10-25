@@ -40,7 +40,11 @@
  * builds (-DCL_COVERAGE) dump the counters first; normal builds are unaffected. */
 #ifdef CL_COVERAGE
 void __gcov_dump(void);
-#define child_exit(code) do { __gcov_dump(); _exit(code); } while (0)
+#define child_exit(code)                                                                                               \
+    do {                                                                                                               \
+        __gcov_dump();                                                                                                 \
+        _exit(code);                                                                                                   \
+    } while (0)
 #else
 #define child_exit(code) _exit(code)
 #endif
@@ -160,7 +164,7 @@ int daemonize(const char *pidfile) {
         pidfile = absolute;
     }
     if (pidfile != NULL && pidfile_is_live(pidfile)) {
-        errno = EEXIST;  /* refuse before detaching, while the user can still see the error */
+        errno = EEXIST; /* refuse before detaching, while the user can still see the error */
         return -1;
     }
     if (pipe(pipefd) != 0) {
@@ -198,7 +202,7 @@ int daemonize(const char *pidfile) {
     }
     if (pid > 0) {
         close(pipefd[1]);
-        child_exit(0);  /* the session leader leaves: the daemon can never get a controlling terminal */
+        child_exit(0); /* the session leader leaves: the daemon can never get a controlling terminal */
     }
     /* the daemon */
     {

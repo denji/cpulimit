@@ -26,9 +26,9 @@
 
 /* How one control chunk is split between letting the target run and stopping it. */
 struct slices {
-    int64_t work_ns;  /* time the processes are allowed to run */
-    int64_t stop_ns;  /* time the processes are stopped */
-    double rate;      /* work_ns / chunk, the "active rate" */
+    int64_t work_ns; /* time the processes are allowed to run */
+    int64_t stop_ns; /* time the processes are stopped */
+    double rate;     /* work_ns / chunk, the "active rate" */
 };
 
 /*

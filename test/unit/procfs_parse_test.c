@@ -13,10 +13,10 @@
 #define TAIL_FROM_PGRP " 1234 1234 34816 1234 4194304 100 0 0 0 "
 #define TAIL_AFTER_STIME " 0 0 20 0 1 0 "
 
-static void make_stat(char *dst, size_t size, const char *head, const char *state, const char *ppid,
-                      const char *utime, const char *stime, const char *start) {
-    snprintf(dst, size, "%s %s %s%s%s %s%s%s 12345678 1000 18446744073709551615\n", head, state, ppid,
-             TAIL_FROM_PGRP, utime, stime, TAIL_AFTER_STIME, start);
+static void make_stat(char *dst, size_t size, const char *head, const char *state, const char *ppid, const char *utime,
+                      const char *stime, const char *start) {
+    snprintf(dst, size, "%s %s %s%s%s %s%s%s 12345678 1000 18446744073709551615\n", head, state, ppid, TAIL_FROM_PGRP,
+             utime, stime, TAIL_AFTER_STIME, start);
 }
 
 static void test_typical(void) {
@@ -34,18 +34,16 @@ static void test_typical(void) {
 /* The command name is attacker-controlled text. The old strtok() parser split it on spaces and
  * mis-assigned every field after it. */
 static void test_hostile_command_names(void) {
-    static const char *heads[] = {
-        "42 (a b)",
-        "42 (a b c d e f g)",
-        "42 (Web Content)",
-        "42 (x) R 99 99 99 99)",           /* a fake ") R 99 ..." inside the name */
-        "42 (a) Z 1 (b)",
-        "42 ()",
-        "42 (((()))",
-        "42 (a\tb)",
-        "42 (name with ) paren and ( more)",
-        NULL
-    };
+    static const char *heads[] = { "42 (a b)",
+                                   "42 (a b c d e f g)",
+                                   "42 (Web Content)",
+                                   "42 (x) R 99 99 99 99)", /* a fake ") R 99 ..." inside the name */
+                                   "42 (a) Z 1 (b)",
+                                   "42 ()",
+                                   "42 (((()))",
+                                   "42 (a\tb)",
+                                   "42 (name with ) paren and ( more)",
+                                   NULL };
     int i;
     for (i = 0; heads[i] != NULL; i++) {
         struct proc_stat st;
@@ -94,7 +92,7 @@ static void test_rejects_malformed(void) {
         "1 (x)",
         "1 (x) S",
         "1 (x) S 2",
-        "1 (x) S 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19",    /* starttime missing */
+        "1 (x) S 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19",      /* starttime missing */
         "1 (x) SS 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20",  /* two-character state */
         "1 (x) S abc 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20", /* non-numeric ppid */
         "1 (x) S -2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20",  /* negative ppid */
@@ -105,13 +103,13 @@ static void test_rejects_malformed(void) {
         NULL
     };
     int i;
-    CHECK(parse_proc_stat(control, &st) == 0);  /* the fixtures themselves are valid */
+    CHECK(parse_proc_stat(control, &st) == 0); /* the fixtures themselves are valid */
     CHECK(st.ppid == 2 && st.utime == 12 && st.stime == 13 && st.starttime == 20);
     memset(&st, 0x5a, sizeof(st));
     for (i = 0; bad[i] != NULL; i++) {
         struct proc_stat probe = st;
         CHECK(parse_proc_stat(bad[i], &probe) == -1);
-        CHECK(memcmp(&probe, &st, sizeof(st)) == 0);  /* untouched on failure */
+        CHECK(memcmp(&probe, &st, sizeof(st)) == 0); /* untouched on failure */
     }
     CHECK(parse_proc_stat(NULL, &st) == -1);
     /* a valid line cut at every possible length must either parse or be rejected, never crash */
@@ -133,17 +131,17 @@ static void test_ticks_to_ms(void) {
     CHECK(ticks_to_ms(1, 100) == 10);
     CHECK(ticks_to_ms(150, 100) == 1500);
     CHECK(ticks_to_ms(3, 1000) == 3);
-    CHECK(ticks_to_ms(7, 128) == 54);                  /* 7000 / 128 = 54.68..., truncated like the old code */
-    CHECK(ticks_to_ms(12345, 0) == 0);                 /* unusable clock rate */
+    CHECK(ticks_to_ms(7, 128) == 54);  /* 7000 / 128 = 54.68..., truncated like the old code */
+    CHECK(ticks_to_ms(12345, 0) == 0); /* unusable clock rate */
     CHECK(ticks_to_ms(12345, -5) == 0);
-    CHECK(ticks_to_ms(UINT64_MAX, 100) == INT64_MAX);  /* saturates instead of wrapping */
+    CHECK(ticks_to_ms(UINT64_MAX, 100) == INT64_MAX); /* saturates instead of wrapping */
     CHECK(ticks_to_ms((uint64_t)INT64_MAX, 1) == INT64_MAX);
-    CHECK(ticks_to_ms(9223372036854775809ULL, 1000) == INT64_MAX);   /* 2^63+1 at 1000 Hz stepped past INT64_MAX */
+    CHECK(ticks_to_ms(9223372036854775809ULL, 1000) == INT64_MAX); /* 2^63+1 at 1000 Hz stepped past INT64_MAX */
     CHECK(ticks_to_ms(9223372036854775807ULL, 1000) == 9223372036854775LL * 1000 + 807);
     /* seconds * 1000 wraps around 2^64 to a small number; the result must still saturate */
     CHECK(ticks_to_ms(18446744073709552ULL, 1) == INT64_MAX);
     /* hz so large that rest * 1000 overflows 64 bits: the answer is still exact */
-    CHECK(ticks_to_ms((uint64_t)LONG_MAX / 2, LONG_MAX) == 499);   /* 0.4999.. s */
+    CHECK(ticks_to_ms((uint64_t)LONG_MAX / 2, LONG_MAX) == 499); /* 0.4999.. s */
     CHECK(ticks_to_ms((uint64_t)LONG_MAX - 1, LONG_MAX) == 999);
     CHECK(ticks_to_ms((uint64_t)LONG_MAX, LONG_MAX) == 1000);
     CHECK(ticks_to_ms((uint64_t)LONG_MAX + (uint64_t)LONG_MAX / 4, LONG_MAX) == 1249);
