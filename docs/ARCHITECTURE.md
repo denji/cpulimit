@@ -17,7 +17,7 @@ src/main.c  (main, control loop, signals)
   ├─ cli/cli.c               argv -> struct cli_config     pure, no exit(), no globals
   ├─ core/limiter.c          controller arithmetic         pure, no I/O
   ├─ core/process_group.c    per-target process table      depends on the iterator + alloc seam
-  │    └─ platform/iterator.c  selects one of platform/{linux,macos,freebsd,openbsd,solaris}/iterator.c
+  │    └─ platform/iterator.c  selects one of platform/{linux,macos,freebsd,openbsd,netbsd,solaris}/iterator.c
   │         └─ platform/procfs_parse.c   /proc/<pid>/stat parser   pure, no allocation
   ├─ runtime/lock.c          one limiter per target        fcntl record lock
   ├─ runtime/daemon.c        detach from the terminal
@@ -27,8 +27,8 @@ src/main.c  (main, control loop, signals)
   └─ core/alloc.h            allocation seam (tests inject failures)
 
 Adding a platform is one new file, `src/platform/<os>/iterator.c`, plus a branch in
-`src/platform/iterator.c`; nothing else includes platform code. NetBSD and DragonFly have no
-iterator yet and are not built.
+`src/platform/iterator.c`; nothing else includes platform code. DragonFly BSD, Haiku and
+GNU/Hurd have no iterator and are not built. OpenBSD and NetBSD share `platform/bsd_sysctl.h`.
 ```
 
 Rules: modules marked *pure* never call `exit()`, never touch global state and

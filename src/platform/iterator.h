@@ -60,11 +60,11 @@ struct process {
     //process identity: start time, only ever compared for equality (together with
     //the pid) to tell a process from a later one that reuses its pid. The unit is
     //platform dependent (clock ticks since boot on Linux, seconds on FreeBSD and Solaris, microseconds
-    //since the epoch on macOS and OpenBSD).
+    //since the epoch on macOS, OpenBSD and NetBSD).
     int64_t starttime;
     //CPU time used by the process (in milliseconds). The resolution depends on the platform's
     //source: Linux whole clock ticks (10 ms at CLK_TCK=100) from /proc/<pid>/stat, macOS
-    //nanoseconds (proc_pidinfo, mach timebase), FreeBSD microseconds (ki_runtime), OpenBSD microseconds (p_rtime), Solaris and
+    //nanoseconds (proc_pidinfo, mach timebase), FreeBSD microseconds (ki_runtime), OpenBSD and NetBSD statistics clock ticks (10 ms at 100 Hz), Solaris and
     //illumos nanoseconds (psinfo pr_time). A consumer only uses differences. (A nanosecond CPU
     //clock was tried on Linux: no measurable accuracy gain in make bench, two more syscalls per
     //cycle, so it was dropped.)
@@ -89,7 +89,7 @@ struct process_filter {
 struct proc_rec;
 #elif defined __APPLE__
 struct apple_rec;
-#elif defined __OpenBSD__
+#elif defined __OpenBSD__ || defined __NetBSD__
 struct bsd_rec;
 #endif
 
@@ -112,7 +112,7 @@ struct process_iterator {
     struct apple_rec *recs;
     size_t nrecs;
     size_t pos;
-#elif defined __OpenBSD__
+#elif defined __OpenBSD__ || defined __NetBSD__
     struct bsd_rec *recs;
     size_t nrecs;
     size_t pos;

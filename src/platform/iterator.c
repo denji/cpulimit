@@ -25,7 +25,7 @@
 #include <string.h>
 #ifdef __sun__
 #include <procfs.h>
-#elif !defined __APPLE__ && !defined __OpenBSD__
+#elif !defined __APPLE__ && !defined __OpenBSD__ && !defined __NetBSD__
 #include <unistd.h>
 #include <sys/procfs.h>
 #endif
@@ -49,6 +49,10 @@
 #elif defined __OpenBSD__
 
 #include "openbsd/iterator.c"
+
+#elif defined __NetBSD__
+
+#include "netbsd/iterator.c"
 
 #elif defined __sun__
 
