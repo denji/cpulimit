@@ -36,7 +36,9 @@ are attached to tagged releases (see [CHANGELOG.md](CHANGELOG.md) for the releas
 | macOS 14/15 | CI builds and runs the unit tests (not the integration tests); the job does not gate a release |
 | FreeBSD 14.1 | CI builds only; the job does not gate a release |
 | Solaris, illumos | iterator contributed in [#3](https://github.com/denji/cpulimit/pull/3); never compiled so far; the experimental `vm` workflow tries Solaris, OmniOS and OpenIndiana (report only) |
-| OpenBSD, NetBSD, DragonFly | not supported (no process iterator) |
+| OpenBSD 8.0, 7.9 | new iterator (sysctl), written without an OpenBSD host; CI builds it and runs the unit tests. Unconfirmed until that job has passed |
+| NetBSD | iterator shared with OpenBSD, written from the NetBSD sources without a host; tried by the experimental `vm` workflow (report only) |
+| DragonFly BSD, Haiku, GNU/Hurd | not supported (no process iterator; the `vm` workflow probes Hurd and Haiku) |
 
 ## Usage
 

@@ -16,12 +16,23 @@ documented in `man cpulimit` are the public interface that 1.x keeps stable.
   gate until then. A probe run in the VM (`test/support/iterprobe.c`) showed that the kernel's
   `p_rtime` advances only in 200 ms steps for a busy process, so the CPU time comes from the
   statistics tick counters; zombies are reported with `p_stat == SDEAD`.
+- NetBSD process iterator (`src/platform/netbsd/iterator.c`). OpenBSD and NetBSD share one
+  implementation, `src/platform/bsd_sysctl.h`, over `KERN_PROC` / `KERN_PROC2`. Written from the
+  NetBSD sources; unconfirmed until the `vm` workflow has run it.
+- `vm` workflow now also builds and tests FreeBSD (15.1, 14.5), HardenedBSD, GhostBSD and NetBSD,
+  runs the full test suite including the integration tests on Debian for riscv64, ppc64le and
+  aarch64 (system emulation), and probes GNU/Hurd and Haiku to see whether an iterator is feasible.
+- The `verify` workflow's CodeQL job prints its findings as one annotation
+  (`tools/sarif_annotations.py`), because the code scanning page cannot be read without a login.
 - `vm` workflow (manual and weekly, report only): tries to build and unit-test the Solaris iterator
   on Solaris, OmniOS and OpenIndiana through `vmactions`. Package names for the compiler are
   unconfirmed. `tools/vm_build.sh` keeps each VM's transcript in a file that a normal step turns
   into an error annotation, because the VM actions only report "ssh exited with code N".
 
 ### Changed
+- Formatting: `.clang-format` (4 spaces, attached braces, `char *p`, 120 columns) replaces
+  `.astylerc`; `.format.sh`, `make format`, `make format-check` and a `format` job in `verify.yml`
+  (clang-format 18). The tree was reformatted: spacing and wrapping only.
 - `tools/ci_run.sh` is POSIX sh (no bash, no `pipefail`), so it runs inside the BSD VMs too.
 - Documentation and notices only, no change in behavior: `AUTHORS` file, a COPYRIGHT section
   in the man page, README reduced to install, usage and limitations. Upgrade notes moved to

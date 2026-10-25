@@ -104,6 +104,13 @@ jobs:
           queries: security-and-quality
       - run: make all
       - uses: github/codeql-action/analyze@v3
+        with:
+          output: sarif-results
+      # The code scanning alerts page needs a login; this prints the same findings as one
+      # annotation (checks API) and in the job log.
+      - name: findings
+        if: always()
+        run: python3 tools/sarif_annotations.py sarif-results "codeql findings"
 
   # The harnesses in verif/ as ordinary programs: every nondeterministic input is drawn at random
   # (with a bias to boundary values), the assertions are the properties. This is random testing of

@@ -20,7 +20,12 @@ log="vm-$name.log"
     command -v gmake >/dev/null 2>&1 || MAKE=make
     echo "+ $MAKE: $(command -v $MAKE)"
     $MAKE --version 2>&1 | head -n 1
-    $MAKE WERROR=1 CFLAGS="-O2 -g" all && $MAKE CFLAGS="-O2 -g" check SKIP_INTEGRATION=1
+    # FULL=1 also runs the integration tests (they need /proc, so only on Linux guests)
+    if [ -n "${FULL:-}" ]; then
+        $MAKE WERROR=1 CFLAGS="-O2 -g" all && $MAKE CFLAGS="-O2 -g" check
+    else
+        $MAKE WERROR=1 CFLAGS="-O2 -g" all && $MAKE CFLAGS="-O2 -g" check SKIP_INTEGRATION=1
+    fi
 } >"$log" 2>&1
 echo $? >"vm-$name.rc"
 # raw kernel fields for the OpenBSD iterator (prints nothing on other systems)

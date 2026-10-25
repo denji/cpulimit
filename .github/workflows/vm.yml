@@ -2,10 +2,17 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 name: vm
 
-# Solaris-family systems in VMs (vmactions). They exercise src/platform/solaris/iterator.c, which
-# has never been compiled by anyone. EXPERIMENTAL: report only, nothing gates on them. Package
-# names for the compiler and GNU make differ between the systems and are unconfirmed; a failed
-# prepare shows up in the annotation. Run by hand (Actions > vm > Run workflow).
+# Other operating systems in QEMU VMs (vmactions/*-vm). EXPERIMENTAL and report only: nothing gates
+# on these jobs. Each VM runs tools/vm_build.sh (or vm_probe.sh), which keeps its transcript in a
+# file that is copied back to the runner; the last step of each job turns it into an annotation
+# (readable through the checks API without logging in). Package names for compilers and GNU make
+# differ between the systems and are unconfirmed; a failed prepare shows up in the annotation.
+#
+#   iterators that exist and are tried here: FreeBSD (and the FreeBSD derivatives HardenedBSD and
+#   GhostBSD, which should select the same code), NetBSD, Solaris, OmniOS, OpenIndiana
+#   Linux on other CPU architectures, with the integration tests (system emulation, a real /proc)
+#   probes only, no iterator: GNU Hurd, Haiku
+# Run by hand (Actions > vm > Run workflow) or wait for the weekly run.
 on:
   workflow_dispatch:
   schedule:
@@ -15,6 +22,72 @@ permissions:
   contents: read
 
 jobs:
+  freebsd:
+    name: freebsd ${{ matrix.release }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ["15.1", "14.5"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: vmactions/freebsd-vm@v1
+        with:
+          release: ${{ matrix.release }}
+          run: PREP="pkg install -y gmake" sh tools/vm_build.sh freebsd
+      - name: result
+        if: always()
+        run: bash tools/ci_run.sh "freebsd ${{ matrix.release }}" sh -c 'cat vm-freebsd.log; exit "$(cat vm-freebsd.rc)"'
+
+  hardenedbsd:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: vmactions/hardenedbsd-vm@v1
+        with:
+          run: PREP="pkg install -y gmake" sh tools/vm_build.sh hardenedbsd
+      - name: result
+        if: always()
+        run: bash tools/ci_run.sh "hardenedbsd" sh -c 'cat vm-hardenedbsd.log; exit "$(cat vm-hardenedbsd.rc)"'
+
+  ghostbsd:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: vmactions/ghostbsd-vm@v1
+        with:
+          run: PREP="pkg install -y gmake" sh tools/vm_build.sh ghostbsd
+      - name: result
+        if: always()
+        run: bash tools/ci_run.sh "ghostbsd" sh -c 'cat vm-ghostbsd.log; exit "$(cat vm-ghostbsd.rc)"'
+
+  # NetBSD: src/platform/netbsd/iterator.c, written from the sources without a NetBSD host.
+  netbsd:
+    name: netbsd ${{ matrix.release }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        release: ["11.0", "10.1"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: vmactions/netbsd-vm@v1
+        with:
+          release: ${{ matrix.release }}
+          run: |
+            PREP='PKG_PATH="http://cdn.netbsd.org/pub/pkgsrc/packages/NetBSD/$(uname -p)/$(uname -r)/All" pkg_add gmake' sh tools/vm_build.sh netbsd
+      - name: result
+        if: always()
+        run: bash tools/ci_run.sh "netbsd ${{ matrix.release }}" sh -c 'cat vm-netbsd.log; exit "$(cat vm-netbsd.rc)"'
+
   solaris:
     runs-on: ubuntu-24.04
     timeout-minutes: 40
@@ -53,3 +126,55 @@ jobs:
       - name: result
         if: always()
         run: bash tools/ci_run.sh "openindiana" sh -c 'cat vm-openindiana.log; exit "$(cat vm-openindiana.rc)"'
+
+  # Linux under system emulation: a real kernel and a real /proc on CPUs the hosted runners do not
+  # have, so the integration tests run too (the musl jobs in ci.yml use qemu-user, which fakes
+  # parts of /proc). Emulated CPUs make CPU accounting meaningless, hence CPULIMIT_SKIP_TIMING.
+  debian:
+    name: debian ${{ matrix.arch }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [riscv64, ppc64le, aarch64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: vmactions/debian-vm@v1
+        with:
+          release: "13"
+          arch: ${{ matrix.arch }}
+          prepare: apt-get update && apt-get install -y build-essential
+          run: FULL=1 CPULIMIT_SKIP_TIMING=1 sh tools/vm_build.sh debian
+      - name: result
+        if: always()
+        run: bash tools/ci_run.sh "debian ${{ matrix.arch }}" sh -c 'cat vm-debian.log; exit "$(cat vm-debian.rc)"'
+
+  # No iterator for these. The probe reports whether one is feasible: does /proc look like Linux's
+  # (Hurd), and what tools are there.
+  hurd-probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: vmactions/hurd-vm@v1
+        with:
+          run: sh tools/vm_probe.sh hurd
+      - name: result
+        if: always()
+        run: sh tools/vm_notice.sh vm-hurd.log "hurd probe"
+
+  haiku-probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: vmactions/haiku-vm@v1
+        with:
+          run: sh tools/vm_probe.sh haiku
+      - name: result
+        if: always()
+        run: sh tools/vm_notice.sh vm-haiku.log "haiku probe"
