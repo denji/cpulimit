@@ -7,38 +7,40 @@ documented in `man cpulimit` are the public interface that 1.x keeps stable.
 
 ## [Unreleased]
 
- 
 ### Added
-- OpenBSD process iterator (`src/platform/openbsd/iterator.c`, `sysctl` kern.proc, no libkvm) and
-  an OpenBSD CI job (8.0 and 7.9, `vmactions/openbsd-vm`) that builds with `-Werror` and runs the
-  unit tests. The iterator was written without an OpenBSD host: its reading of `p_rtime`,
-  `p_ustart` and `KERN_PROC_ARGV` is unconfirmed until that job has passed, and the job does not
-  gate until then. A probe run in the VM (`test/support/iterprobe.c`) showed that the kernel's
-  `p_rtime` advances only in 200 ms steps for a busy process, so the CPU time comes from the
-  statistics tick counters; zombies are reported with `p_stat == SDEAD`.
-- NetBSD process iterator (`src/platform/netbsd/iterator.c`). OpenBSD and NetBSD share one
-  implementation, `src/platform/bsd_sysctl.h`, over `KERN_PROC` / `KERN_PROC2`. Written from the
-  NetBSD sources; unconfirmed until the `vm` workflow has run it.
-- `vm` workflow now also builds and tests FreeBSD (15.1, 14.5), HardenedBSD, GhostBSD and NetBSD,
-  runs the full test suite including the integration tests on Debian for riscv64, ppc64le and
-  aarch64 (system emulation), and probes GNU/Hurd and Haiku to see whether an iterator is feasible.
-- The `verify` workflow's CodeQL job prints its findings as one annotation
-  (`tools/sarif_annotations.py`), because the code scanning page cannot be read without a login.
-- `vm` workflow (manual and weekly, report only): tries to build and unit-test the Solaris iterator
-  on Solaris, OmniOS and OpenIndiana through `vmactions`. Package names for the compiler are
-  unconfirmed. `tools/vm_build.sh` keeps each VM's transcript in a file that a normal step turns
-  into an error annotation, because the VM actions only report "ssh exited with code N".
+- OpenBSD support: a process iterator over `sysctl` (`src/platform/openbsd/iterator.c`, no libkvm)
+  and an OpenBSD CI job (8.0 and 7.9). CPU time is read from the statistics tick counters,
+  because `p_rtime` only advances when a process is switched out (200 ms steps for a busy
+  process), and zombies are recognised by `p_stat == SDEAD`. The unit and command-mode tests pass
+  on 7.9; 8.0 passed all but a per-sample timing bound of the unit test, which is now looser on
+  OpenBSD (statistics ticks are taken at randomised instants).
+- NetBSD support: `src/platform/netbsd/iterator.c`. OpenBSD and NetBSD share
+  `src/platform/bsd_sysctl.h` over `KERN_PROC` / `KERN_PROC2`. Written from the NetBSD sources;
+  not yet run on NetBSD.
+- `vm` workflow (manual and weekly, report only) on QEMU VMs from `vmactions`: FreeBSD 15.1 and
+  14.5, HardenedBSD, GhostBSD, NetBSD 11.0 and 10.1, Solaris, OmniOS and OpenIndiana (build and
+  unit tests); Debian 13 on riscv64, ppc64le and aarch64 (full suite including the integration
+  tests); probes for GNU/Hurd and Haiku. Compiler package names for some systems are unconfirmed.
+- Each VM job copies its transcript back and prints it as a GitHub annotation
+  (`tools/vm_build.sh`, `tools/vm_probe.sh`, `tools/vm_notice.sh`), because the VM actions only
+  report "ssh exited with code N". The CodeQL job prints its findings the same way
+  (`tools/sarif_annotations.py`), since the code scanning page needs a login.
+- `AUTHORS`, `docs/UPGRADING.md` (differences from the original cpulimit that scripts can notice)
+  and `docs/VERIFICATION.md` (what is tested, what is not, benchmarks).
 
 ### Changed
 - Formatting: `.clang-format` (4 spaces, attached braces, `char *p`, 120 columns) replaces
-  `.astylerc`; `.format.sh`, `make format`, `make format-check` and a `format` job in `verify.yml`
-  (clang-format 18). The tree was reformatted: spacing and wrapping only.
-- `tools/ci_run.sh` is POSIX sh (no bash, no `pipefail`), so it runs inside the BSD VMs too.
-- Documentation and notices only, no change in behavior: `AUTHORS` file, a COPYRIGHT section
-  in the man page, README reduced to install, usage and limitations. Upgrade notes moved to
-  `docs/UPGRADING.md`, verification and benchmarks to `docs/VERIFICATION.md`.
-- README and docs state the real CI coverage of macOS (build and unit tests), FreeBSD (build only)
-  and Solaris (not built); OpenBSD, NetBSD and DragonFly are listed as unsupported.
+  `.astylerc`. `.format.sh`, `make format`, `make format-check` and a `format` job in
+  `verify.yml` (clang-format 18). The tree was reformatted; spacing and wrapping only.
+- Copyright: `Copyright (C) 2016-2017, 2019, 2026 Denys Denysov` and
+  `SPDX-License-Identifier: GPL-2.0-or-later` in the files written for this fork; e-mail addresses
+  removed from the source headers; a COPYRIGHT section in the man page.
+- README reduced to install, usage, platforms and known limitations; the rest moved to `docs/`.
+- Source file headers say "limit the CPU usage of a process" (as the man page does) instead of "a CPU
+  limiter for Linux", which stopped being true with the BSD, macOS and Solaris iterators.
+- `tools/ci_run.sh` is POSIX sh (no bash, no `pipefail`), so it also runs inside the BSD VMs.
+- The platform table states what CI really covers: macOS builds and runs the unit tests, FreeBSD
+  only builds, Solaris has never been compiled.
 
 ## [1.0.2] - 2026-10-24
 
@@ -63,10 +65,11 @@ log text; the throttling logic is the 1.0.1 logic.
   89.2% / 78.6% as before): `src/{cli,core,runtime,platform,util}/`, one directory per platform
   under `src/platform/`, tests split into `test/{unit,integration,support}/`, `scripts/` and
   `bench/` merged into `tools/`. `src/cpulimit` is still built for scripts that expect it.
-- CBMC moved out of the push workflows into `cbmc.yml` (manual and weekly): one job per harness and
-  solver back end (default, CaDiCaL when the installed CBMC offers it; Bitwuzla via SMT2 was tried and failed), exit status and
-  time in the job summary, newest CBMC release installed by `tools/install_cbmc.sh`. The random-test
-  harnesses (`make verif-sim`) became a required `verify` job.
+- CBMC moved out of the push workflows into `cbmc.yml` (manual and weekly), one job per harness
+  and solver: the default solver, and CaDiCaL when the installed CBMC offers it (Bitwuzla through
+  SMT2 was tried and failed). Exit status and time go to the job summary; the newest CBMC release
+  is installed by `tools/install_cbmc.sh`. The random-test harnesses (`make verif-sim`) became a
+  required `verify` job.
 - `cputime` units and per-platform resolution documented in `src/platform/iterator.h`. A nanosecond
   CPU clock for the Linux single-target path was tried and dropped: no measurable accuracy gain in
   `make bench`, two more system calls per cycle.
@@ -148,5 +151,7 @@ First release of the fork after the redesign. Starts from the upstream 0.3.2 cod
 - The release workflow (static musl binaries for seven architectures) had not been run when this
   entry was written.
 
+[Unreleased]: https://github.com/denji/cpulimit/compare/1.0.2...HEAD
+[1.0.2]: https://github.com/denji/cpulimit/releases/tag/1.0.2
 [1.0.1]: https://github.com/denji/cpulimit/releases/tag/1.0.1
 [1.0.0]: https://github.com/denji/cpulimit/releases/tag/1.0.0

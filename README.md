@@ -35,10 +35,14 @@ are attached to tagged releases (see [CHANGELOG.md](CHANGELOG.md) for the releas
 | Linux, musl | CI: x86_64, i386, arm64, armv7, ppc64le, s390x, riscv64 (qemu-user except x86_64) |
 | macOS 14/15 | CI builds and runs the unit tests (not the integration tests); the job does not gate a release |
 | FreeBSD 14.1 | CI builds only; the job does not gate a release |
-| Solaris, illumos | iterator contributed in [#3](https://github.com/denji/cpulimit/pull/3); never compiled so far; the experimental `vm` workflow tries Solaris, OmniOS and OpenIndiana (report only) |
-| OpenBSD 8.0, 7.9 | new iterator (sysctl), written without an OpenBSD host; CI builds it and runs the unit tests. Unconfirmed until that job has passed |
-| NetBSD | iterator shared with OpenBSD, written from the NetBSD sources without a host; tried by the experimental `vm` workflow (report only) |
-| DragonFly BSD, Haiku, GNU/Hurd | not supported (no process iterator; the `vm` workflow probes Hurd and Haiku) |
+| OpenBSD 7.9, 8.0 | CI builds with `-Werror` and runs the unit tests. 7.9 passes; 8.0 passed all but one timing bound, since relaxed. The job does not gate a release |
+| NetBSD | shares the OpenBSD code; written from the NetBSD sources and not yet run on NetBSD |
+| Solaris, illumos | iterator contributed in [#3](https://github.com/denji/cpulimit/pull/3); never compiled so far (the `vm` workflow tries Solaris, OmniOS and OpenIndiana) |
+| DragonFly BSD, Haiku, GNU/Hurd | not supported: no process iterator |
+
+The experimental [`vm` workflow](.github/workflows/vm.yml) (manual and weekly, report only) also
+tries FreeBSD 15.1/14.5, HardenedBSD, GhostBSD and NetBSD, and runs the full test suite on Debian
+for riscv64, ppc64le and aarch64.
 
 ## Usage
 
@@ -92,7 +96,7 @@ TARGET is exactly one of:  -p PID | -e NAME_OR_PATH | COMMAND [ARGS]
 
 ## Contributing
 
-Bug fixes, tests, and ports are welcome. Run `make check analyze verif-sim` before sending a
+Bug fixes, tests, and ports are welcome. Run `make check analyze verif-sim format-check` before sending a
 change, and add a test that fails without it. Changes to the controller or the process table must
 keep the invariants in `docs/ARCHITECTURE.md`.
 
