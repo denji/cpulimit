@@ -1,6 +1,6 @@
 /**
  *
- * cpulimit - a CPU limiter for Linux
+ * cpulimit - limit the CPU usage of a process
  *
  * Copyright (C) 2016-2017, 2019, 2026 Denys Denysov
  *
