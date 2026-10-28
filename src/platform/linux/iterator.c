@@ -28,6 +28,7 @@
 
 #include "core/alloc.h"
 #include "platform/procfs_parse.h"
+#include "platform/snapshot.h"
 
 /*
  * Linux iterator. Three ways to walk the processes, chosen once in init:
@@ -41,14 +42,6 @@
  * (their cmdline is empty).
  */
 enum { IT_DONE = 0, IT_SINGLE, IT_SCAN, IT_COLLECT, IT_SNAPSHOT };
-
-struct proc_rec {
-    pid_t pid;
-    pid_t ppid;
-    int64_t cputime;
-    int64_t starttime;
-    int marked;
-};
 
 #define STAT_BUF_SIZE 1024
 
@@ -113,7 +106,7 @@ static pid_t parse_pid_name(const char *name) {
 }
 
 //stat of a live (non-zombie) process; 0 on success, -1 if it is gone, unreadable or a zombie
-static int stat_of(pid_t pid, struct proc_rec *r) {
+static int stat_of(pid_t pid, struct snap_rec *r) {
     char path[48];
     char buf[STAT_BUF_SIZE];
     struct proc_stat st;
@@ -138,7 +131,7 @@ static int stat_of(pid_t pid, struct proc_rec *r) {
     r->ppid = st.ppid;
     r->cputime = cpu;
     r->starttime = st.starttime > (uint64_t)INT64_MAX ? INT64_MAX : (int64_t)st.starttime;
-    r->marked = 0;
+    r->selected = 0;
     return 0;
 }
 
@@ -159,7 +152,7 @@ static void read_command(pid_t pid, char *dst) {
     dst[len] = '\0';
 }
 
-static void fill_process(struct process *p, const struct proc_rec *r, int need_command) {
+static void fill_process(struct process *p, const struct snap_rec *r, int need_command) {
     p->pid = r->pid;
     p->ppid = r->ppid;
     p->cputime = r->cputime;
@@ -194,83 +187,18 @@ int init_process_iterator(struct process_iterator *it, struct process_filter *fi
     return 0;
 }
 
-struct edge {
-    pid_t ppid;
-    size_t idx;
-};
-
-static int edge_cmp(const void *a, const void *b) {
-    const struct edge *x = (const struct edge *)a;
-    const struct edge *y = (const struct edge *)b;
-    if (x->ppid != y->ppid) {
-        return x->ppid < y->ppid ? -1 : 1;
-    }
-    return x->idx < y->idx ? -1 : (x->idx > y->idx ? 1 : 0);
-}
-
-//mark the target and all its descendants, breadth first over a ppid-sorted index
-static int mark_descendants(struct process_iterator *it) {
-    size_t n = it->nrecs;
-    size_t i, head = 0, tail = 0;
-    struct edge *edges;
-    size_t *queue;
-    if (n == 0) {
-        return 0;
-    }
-    edges = (struct edge *)CL_MALLOC(n * sizeof(*edges));
-    queue = (size_t *)CL_MALLOC(n * sizeof(*queue));
-    if (edges == NULL || queue == NULL) {
-        CL_FREE(edges);
-        CL_FREE(queue);
-        return -1;
-    }
-    for (i = 0; i < n; i++) {
-        edges[i].ppid = it->recs[i].ppid;
-        edges[i].idx = i;
-    }
-    qsort(edges, n, sizeof(*edges), edge_cmp);
-    for (i = 0; i < n; i++) {
-        if (it->recs[i].pid == it->filter->pid) {
-            it->recs[i].marked = 1;
-            queue[tail++] = i;
-        }
-    }
-    while (head < tail) {
-        pid_t parent = it->recs[queue[head++]].pid;
-        size_t lo = 0, hi = n;
-        while (lo < hi) {  //first edge whose ppid >= parent
-            size_t mid = lo + (hi - lo) / 2;
-            if (edges[mid].ppid < parent) {
-                lo = mid + 1;
-            } else {
-                hi = mid;
-            }
-        }
-        for (; lo < n && edges[lo].ppid == parent; lo++) {
-            struct proc_rec *child = &it->recs[edges[lo].idx];
-            if (!child->marked) {
-                child->marked = 1;
-                queue[tail++] = edges[lo].idx;
-            }
-        }
-    }
-    CL_FREE(edges);
-    CL_FREE(queue);
-    return 0;
-}
-
 static int collect_group(struct process_iterator *it) {
     struct dirent *dit;
     size_t cap = 0;
     while ((dit = readdir(it->dip)) != NULL) {
-        struct proc_rec r;
+        struct snap_rec r;
         pid_t pid = parse_pid_name(dit->d_name);
         if (pid == 0 || stat_of(pid, &r) != 0) {
             continue;  //not a process, already gone, or a zombie
         }
         if (it->nrecs == cap) {
             size_t ncap = cap == 0 ? 256 : cap * 2;
-            struct proc_rec *grown = (struct proc_rec *)CL_REALLOC(it->recs, ncap * sizeof(*grown));
+            struct snap_rec *grown = (struct snap_rec *)CL_REALLOC(it->recs, ncap * sizeof(*grown));
             if (grown == NULL) {
                 return -1;
             }
@@ -281,12 +209,12 @@ static int collect_group(struct process_iterator *it) {
     }
     closedir(it->dip);
     it->dip = NULL;
-    return mark_descendants(it);
+    return snapshot_select(it->recs, it->nrecs, sizeof(*it->recs), it->filter->pid, 1);
 }
 
 int get_next_process(struct process_iterator *it, struct process *p) {
     struct dirent *dit;
-    struct proc_rec r;
+    struct snap_rec r;
     int need = it->filter != NULL && it->filter->need_command;
     switch (it->mode) {
     case IT_SINGLE:
@@ -319,8 +247,8 @@ int get_next_process(struct process_iterator *it, struct process *p) {
     /* fall through */
     case IT_SNAPSHOT:
         while (it->pos < it->nrecs) {
-            const struct proc_rec *rec = &it->recs[it->pos++];
-            if (rec->marked) {
+            const struct snap_rec *rec = &it->recs[it->pos++];
+            if (rec->selected) {
                 fill_process(p, rec, need);
                 return 0;
             }

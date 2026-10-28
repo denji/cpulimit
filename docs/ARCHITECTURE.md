@@ -18,6 +18,7 @@ src/main.c  (main, control loop, signals)
   ├─ core/limiter.c          controller arithmetic         pure, no I/O
   ├─ core/process_group.c    per-target process table      depends on the iterator + alloc seam
   │    └─ platform/iterator.c  selects one of platform/{linux,macos,freebsd,openbsd,netbsd,solaris}/iterator.c
+  │         ├─ platform/snapshot.c      the target and its descendants, shared by every snapshot iterator
   │         └─ platform/procfs_parse.c   /proc/<pid>/stat parser   pure, no allocation
   ├─ runtime/lock.c          one limiter per target        fcntl record lock
   ├─ runtime/daemon.c        detach from the terminal
@@ -120,9 +121,10 @@ before use. Keying on the start time means a recycled pid is a different target.
 | Controller invariants L1-L4, tick conversion, `/proc` parser memory safety | harnesses run as random tests on every push (`make verif-sim`) and as bounded proofs under CBMC (`make verif-cbmc`, workflow `cbmc.yml`, experimental) | `verif/` |
 | Memory safety / leaks / UB | ASan, UBSan, clang integer sanitizers, valgrind, allocation-failure injection | CI `verify` |
 | `list.c` | model-based test against an array, allocation failure | `test/unit/list_test.c` |
+| `snapshot.c` | fixed-point model on random process tables, cycles, allocation failure | `test/unit/snapshot_test.c` |
 | Process table behavior | scripted iterator (deterministic) | `test/unit/group_test.c` |
 | Limiting accuracy, signal handling, S1 | integration tests with real processes | `test/integration/integration_test.sh` |
-| Fixed defects stay fixed | 20 mutants, each must fail a unit test | `tools/mutation.sh` |
+| Fixed defects stay fixed | 25 mutants, each must fail a unit test | `tools/mutation.sh` |
 | Load, leaks over time | fork/exit churn under `-i`, 300 children, RSS flat, valgrind | `test/integration/stress_test.sh` |
 | Test adequacy | line and branch coverage by gcov, including daemon children | `tools/coverage.sh` |
 | Static analysis | `gcc -fanalyzer` (must be silent), clang-tidy, cppcheck, scan-build, CodeQL | `make analyze`, CI |
@@ -134,7 +136,7 @@ Limits of this approach:
 * CBMC proofs are bounded (loops unwound to a stated depth) and cover three pure functions only.
   Everything else is tested, not proved. The harnesses also run in simulation mode and against
   mutants. Which harnesses CBMC has finished is in [VERIFICATION.md](VERIFICATION.md).
-* The macOS, FreeBSD, OpenBSD and Solaris iterators were written or adapted without a host to
+* The macOS, FreeBSD, OpenBSD, NetBSD and Solaris iterators were written or adapted without a host to
   compile them on. CI builds macOS, FreeBSD and OpenBSD (Solaris is not built), and those jobs do
   not gate until they have passed once.
 * Unreachable defensive clamps in `core/limiter.c` (lines that no input can reach) are not covered by

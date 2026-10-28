@@ -59,8 +59,8 @@ struct process {
     pid_t ppid;
     //process identity: start time, only ever compared for equality (together with
     //the pid) to tell a process from a later one that reuses its pid. The unit is
-    //platform dependent (clock ticks since boot on Linux, seconds on FreeBSD and Solaris, microseconds
-    //since the epoch on macOS, OpenBSD and NetBSD).
+    //platform dependent (clock ticks since boot on Linux, seconds on Solaris, microseconds
+    //since the epoch on macOS, FreeBSD, OpenBSD and NetBSD).
     int64_t starttime;
     //CPU time used by the process (in milliseconds). The resolution depends on the platform's
     //source: Linux whole clock ticks (10 ms at CLK_TCK=100) from /proc/<pid>/stat, macOS
@@ -85,10 +85,13 @@ struct process_filter {
     int need_command;
 };
 
+/* snapshot-based iterators (platform/snapshot.h): the platform record starts with a snap_rec */
 #if defined __linux__
-struct proc_rec;
+struct snap_rec;
 #elif defined __APPLE__
-struct apple_rec;
+struct snap_rec;
+#elif defined __FreeBSD__
+struct freebsd_rec;
 #elif defined __OpenBSD__ || defined __NetBSD__
 struct bsd_rec;
 #endif
@@ -97,7 +100,7 @@ struct process_iterator {
 #if defined __linux__
     DIR *dip;
     int mode;
-    struct proc_rec *recs;
+    struct snap_rec *recs;
     size_t nrecs;
     size_t pos;
 #elif defined __sun__
@@ -105,11 +108,11 @@ struct process_iterator {
     int boot_time;
 #elif defined __FreeBSD__
     kvm_t *kd;
-    struct kinfo_proc *procs;
-    int count;
-    int i;
+    struct freebsd_rec *recs;
+    size_t nrecs;
+    size_t pos;
 #elif defined __APPLE__
-    struct apple_rec *recs;
+    struct snap_rec *recs;
     size_t nrecs;
     size_t pos;
 #elif defined __OpenBSD__ || defined __NetBSD__

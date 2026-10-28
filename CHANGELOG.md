@@ -28,7 +28,21 @@ documented in `man cpulimit` are the public interface that 1.x keeps stable.
 - `AUTHORS`, `docs/UPGRADING.md` (differences from the original cpulimit that scripts can notice)
   and `docs/VERIFICATION.md` (what is tested, what is not, benchmarks).
 
+### Fixed
+- FreeBSD: `-i` limited only the direct children of the target, not grandchildren. The iterator now
+  selects the whole tree, as the Linux iterator always did. It also bounds the copy of argv[0] into
+  the command buffer itself instead of relying on libkvm's limit, skips zombies and kernel
+  processes (zombies were listed), reads argv only when it is needed, and closes the kvm descriptor
+  on every error path. Run only through the build and the unit tests of the `vm` workflow so far.
+
 ### Changed
+- One implementation of "the target and all its descendants" (`src/platform/snapshot.c`, O(n log n),
+  safe against a pid that is its own parent) for the Linux, macOS, FreeBSD, OpenBSD and NetBSD
+  iterators; it replaces a copy per platform, three of them quadratic or worse. The Linux behaviour
+  is unchanged. Unit tests compare it with a plain fixed-point model on 20000 random process
+  tables and inject every allocation failure (`test/unit/snapshot_test.c`); five mutants of it are
+  killed by the mutation script (25 of 25 now). `make coverage` and the valgrind job listed the unit
+  tests by hand and would have missed the new one; both now include it.
 - Formatting: `.clang-format` (4 spaces, attached braces, `char *p`, 120 columns) replaces
   `.astylerc`. `.format.sh`, `make format`, `make format-check` and a `format` job in
   `verify.yml` (clang-format 18). The tree was reformatted; spacing and wrapping only.

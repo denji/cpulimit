@@ -20,92 +20,140 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+/* Process iterator for FreeBSD, over libkvm (kvm_getprocs; the descriptor is opened on /dev/null,
+ * so it only uses sysctl and needs no group membership). As on Linux, macOS and OpenBSD the
+ * processes are copied into a snapshot when the iterator is initialised and platform/snapshot.c
+ * selects the target and its descendants.
+ *
+ * Not run on FreeBSD as of this writing beyond the unit tests of the `vm` workflow: the fields
+ * used are the documented ki_* members of struct kinfo_proc. */
+
+#include <sys/param.h>
 #include <sys/sysctl.h>
 #include <sys/user.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <paths.h>
+#include <string.h>
+
+#include "platform/snapshot.h"
+
+#ifndef SZOMB
+#define SZOMB 5 /* <sys/proc.h> */
+#endif
+
+/* One process as seen by the snapshot taken in init_process_iterator(). */
+struct freebsd_rec {
+    struct snap_rec s;     /* first; starttime is in microseconds since the epoch */
+    struct kinfo_proc *kp; /* owned by libkvm: valid until kvm_close(), used to read argv */
+    char comm[COMMLEN + 1];
+};
+
+/* 0 when the entry is a live process cpulimit may consider; -1 for zombies and kernel processes. */
+static int to_rec(struct kinfo_proc *kp, struct freebsd_rec *r) {
+    if (kp->ki_stat == SZOMB || (kp->ki_flag & P_SYSTEM)) {
+        return -1;
+    }
+    r->s.pid = kp->ki_pid;
+    r->s.ppid = kp->ki_ppid;
+    r->s.starttime = (int64_t)kp->ki_start.tv_sec * 1000000 + (int64_t)kp->ki_start.tv_usec;
+    r->s.cputime = (int64_t)(kp->ki_runtime / 1000); /* ki_runtime is in microseconds */
+    r->s.selected = 0;
+    r->kp = kp;
+    strncpy(r->comm, kp->ki_comm, sizeof(r->comm) - 1);
+    r->comm[sizeof(r->comm) - 1] = '\0';
+    return 0;
+}
 
 int init_process_iterator(struct process_iterator *it, struct process_filter *filter) {
     char errbuf[_POSIX2_LINE_MAX];
-    it->i = 0;
-    /* Open the kvm interface, get a descriptor */
+    struct kinfo_proc *procs;
+    int count = 0, i;
+    size_t n = 0;
+    struct freebsd_rec *recs;
+    int single = filter->pid != 0 && !filter->include_children;
+
+    it->filter = filter;
+    it->kd = NULL;
+    it->recs = NULL;
+    it->nrecs = 0;
+    it->pos = 0;
     if ((it->kd = kvm_openfiles(NULL, _PATH_DEVNULL, NULL, O_RDONLY, errbuf)) == NULL) {
         fprintf(stderr, "kvm_open: %s\n", errbuf);
         return -1;
     }
-    /* Get the list of processes. */
-    if ((it->procs = kvm_getprocs(it->kd, KERN_PROC_PROC, 0, &it->count)) == NULL) {
+    procs = kvm_getprocs(it->kd, single ? KERN_PROC_PID : KERN_PROC_PROC, single ? filter->pid : 0, &count);
+    if (procs == NULL) {
+        fprintf(stderr, "kvm_getprocs: %s\n", kvm_geterr(it->kd));
         kvm_close(it->kd);
-        //		fprintf(stderr, "kvm_getprocs: %s\n", kvm_geterr(it->kd));
+        it->kd = NULL;
         return -1;
     }
-    it->filter = filter;
-    return 0;
-}
-
-static int kproc2proc(kvm_t *kd, struct kinfo_proc *kproc, struct process *proc) {
-    proc->pid = kproc->ki_pid;
-    proc->ppid = kproc->ki_ppid;
-    proc->cputime = kproc->ki_runtime / 1000;
-    proc->starttime = kproc->ki_start.tv_sec;
-    char **args = kvm_getargv(kd, kproc, sizeof(proc->command));
-    if (args == NULL) {
+    if (count <= 0) {
+        return 0; /* the target is gone: an empty answer, not an error */
+    }
+    recs = (struct freebsd_rec *)malloc((size_t)count * sizeof(*recs));
+    if (recs == NULL) {
+        fprintf(stderr, "malloc: %s\n", strerror(errno));
+        kvm_close(it->kd);
+        it->kd = NULL;
         return -1;
     }
-    memcpy(proc->command, args[0], strlen(args[0]) + 1);
-    return 0;
-}
-
-static int get_single_process(kvm_t *kd, pid_t pid, struct process *process) {
-    int count;
-    struct kinfo_proc *kproc = kvm_getprocs(kd, KERN_PROC_PID, pid, &count);
-    if (count == 0 || kproc == NULL) {
-        //		fprintf(stderr, "kvm_getprocs: %s\n", kvm_geterr(kd));
+    for (i = 0; i < count; i++) {
+        if (to_rec(&procs[i], &recs[n]) == 0) {
+            n++;
+        }
+    }
+    it->recs = recs;
+    it->nrecs = n;
+    if (snapshot_select(recs, n, sizeof(*recs), filter->pid, filter->include_children) != 0) {
+        fprintf(stderr, "malloc: %s\n", strerror(errno));
+        free(recs);
+        it->recs = NULL;
+        it->nrecs = 0;
+        kvm_close(it->kd);
+        it->kd = NULL;
         return -1;
     }
-    kproc2proc(kd, kproc, process);
     return 0;
 }
 
 int get_next_process(struct process_iterator *it, struct process *p) {
-    if (it->i == it->count) {
-        return -1;
-    }
-    if (it->filter->pid != 0 && !it->filter->include_children) {
-        if (get_single_process(it->kd, it->filter->pid, p) != 0) {
-            it->i = it->count = 0;
-            return -1;
-        }
-        it->i = it->count = 1;
-        return 0;
-    }
-    while (it->i < it->count) {
-        struct kinfo_proc *kproc = &(it->procs[it->i]);
-        if (kproc->ki_flag & P_SYSTEM) {
-            // skip system processes
-            it->i++;
+    while (it->pos < it->nrecs) {
+        const struct freebsd_rec *r = &it->recs[it->pos++];
+        if (!r->s.selected) {
             continue;
         }
-        if (it->filter->pid != 0 && it->filter->include_children) {
-            kproc2proc(it->kd, kproc, p);
-            it->i++;
-            if (p->pid != it->filter->pid && p->ppid != it->filter->pid) {
-                continue;
-            }
-            return 0;
-        } else if (it->filter->pid == 0) {
-            kproc2proc(it->kd, kproc, p);
-            it->i++;
-            return 0;
+        p->pid = r->s.pid;
+        p->ppid = r->s.ppid;
+        p->starttime = r->s.starttime;
+        p->cputime = r->s.cputime;
+        p->cpu_usage = -1;
+        p->group_seq = 0;
+        p->command[0] = '\0';
+        if (it->filter->need_command) {
+            /* argv[0] as on Linux; the process name when argv cannot be read (not ours, empty) */
+            char **args = kvm_getargv(it->kd, r->kp, 0);
+            const char *src = (args != NULL && args[0] != NULL) ? args[0] : r->comm;
+            strncpy(p->command, src, sizeof(p->command) - 1);
+            p->command[sizeof(p->command) - 1] = '\0';
         }
+        return 0;
     }
     return -1;
 }
 
 int close_process_iterator(struct process_iterator *it) {
-    if (kvm_close(it->kd) == -1) {
-        fprintf(stderr, "kvm_getprocs: %s\n", kvm_geterr(it->kd));
-        return -1;
+    int ret = 0;
+    free(it->recs);
+    it->recs = NULL;
+    it->nrecs = 0;
+    it->pos = 0;
+    if (it->kd != NULL && kvm_close(it->kd) == -1) {
+        fprintf(stderr, "kvm_close: %s\n", strerror(errno));
+        ret = -1;
     }
-    return 0;
+    it->kd = NULL;
+    it->filter = NULL;
+    return ret;
 }

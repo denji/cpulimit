@@ -19,3 +19,8 @@ group: pid reuse not detected (starttime ignored) | src/core/process_group.c | s
 group: terminated processes never swept | src/core/process_group.c | s|p->group_seq != pgroup->generation|0|
 cli: -l upper bound off by one | src/cli/cli.c | s|cfg->limit_pct > 100 \* ncpu|cfg->limit_pct > 100 * ncpu + 1|
 cli: chunk lower bound allows 0 | src/cli/cli.c | s|cfg->chunk_us < 1|cfg->chunk_us < 0|
+snapshot: descendants not followed | src/platform/snapshot.c | s|if (!child->selected) {|if (0) {|
+snapshot: binary search lands one edge late | src/platform/snapshot.c | s|lo = mid + 1;|lo = mid + 2;|
+snapshot: target 0 does not select all | src/platform/snapshot.c | s|r->selected = (target == 0 \|\| r->pid == target);|r->selected = (r->pid == target);|
+snapshot: children selected without include_children | src/platform/snapshot.c | s|if (target == 0 \|\| !include_children \|\| n == 0) {|if (target == 0 \|\| n == 0) {|
+snapshot: queue allocation unchecked | src/platform/snapshot.c | s|if (edges == NULL \|\| queue == NULL) {|if (edges == NULL) {|

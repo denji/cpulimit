@@ -49,13 +49,13 @@ endif
 #   src/util      small helpers
 # Objects keep the directory structure under $(BUILD).
 CORE_SRC   := core/list.c core/process_group.c core/limiter.c
-PLAT_SRC   := platform/iterator.c platform/procfs_parse.c
+PLAT_SRC   := platform/iterator.c platform/procfs_parse.c platform/snapshot.c
 UTIL_SRC   := util/util.c
 LIB_OBJS   := $(patsubst %.c,$(BUILD)/%.o,$(CORE_SRC) $(PLAT_SRC) $(UTIL_SRC))
 # modules used by the executable only (they pull in syslog, fork, fcntl and the CLI)
 APP_OBJS   := $(patsubst %.c,$(BUILD)/%.o,cli/cli.c runtime/lock.c runtime/daemon.c runtime/log.c)
 MAIN_OBJ   := $(BUILD)/main.o
-UNIT_TESTS := process_iterator_test util_test limiter_test procfs_parse_test group_test list_test cli_parse_test lock_test
+UNIT_TESTS := process_iterator_test util_test limiter_test procfs_parse_test snapshot_test group_test list_test cli_parse_test lock_test
 TEST_BINS  := $(addprefix $(BUILD)/test/,$(UNIT_TESTS) busy spawn)
 
 .PHONY: format format-check format format-check analyze verif-sim verif-cbmc stress bench fuzz-standalone fuzz-libfuzzer coverage all check test man install uninstall static static-install static_install \
@@ -92,6 +92,13 @@ $(BUILD)/test/group_test: $(TESTDIR)/unit/group_test.c $(TESTDIR)/support/fake_i
 	$(CC) $(ALL_CPPFLAGS) -I$(TESTDIR) -UNDEBUG $(ALL_CFLAGS) -o $@ $(filter %.c %.o,$^) $(LDFLAGS)
 
 $(BUILD)/test/list_test: $(TESTDIR)/unit/list_test.c $(TESTDIR)/support/fault_alloc.c $(BUILD)/test/gt_list.o $(BUILD)/.flags
+	$(CC) $(ALL_CPPFLAGS) -I$(TESTDIR) -UNDEBUG $(ALL_CFLAGS) -o $@ $(filter %.c %.o,$^) $(LDFLAGS)
+
+# snapshot.c is rebuilt with the allocation seam on, to test the allocation failure path
+$(BUILD)/test/gt_snapshot.o: $(SRCDIR)/platform/snapshot.c $(BUILD)/.flags
+	$(CC) $(ALL_CPPFLAGS) $(GT_DEFS) -MMD -MP $(ALL_CFLAGS) -c -o $@ $<
+
+$(BUILD)/test/snapshot_test: $(TESTDIR)/unit/snapshot_test.c $(TESTDIR)/support/fault_alloc.c $(BUILD)/test/gt_snapshot.o $(BUILD)/.flags
 	$(CC) $(ALL_CPPFLAGS) -I$(TESTDIR) -UNDEBUG $(ALL_CFLAGS) -o $@ $(filter %.c %.o,$^) $(LDFLAGS)
 
 $(BUILD)/test/busy: $(TESTDIR)/support/busy.c $(BUILD)/.flags

@@ -114,7 +114,7 @@ Between reading a process and signalling it, its pid can in principle be
 recycled; the window is one control cycle. Processes are identified by pid and
 start time, which removes the much larger window of earlier versions.
 .IP \(bu 2
-Only Linux, macOS, FreeBSD, OpenBSD and Solaris/illumos have an iterator. Solaris/illumos is not built or tested.
+Only Linux, macOS, FreeBSD, OpenBSD, NetBSD and Solaris/illumos have an iterator. NetBSD and Solaris/illumos are not yet tested on a real system.
 Controlling processes of other users needs the privilege to signal them.
 .SH EXAMPLES
 .nf

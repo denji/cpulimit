@@ -48,8 +48,8 @@ jobs:
       - run: make WERROR=1 CFLAGS="-O1 -g" all
       - name: unit tests under valgrind
         run: |
-          make CFLAGS="-O1 -g" $(for t in process_iterator util limiter procfs_parse group list cli_parse lock; do printf 'build/test/%s_test ' $t; done)
-          for t in process_iterator util limiter procfs_parse group list cli_parse lock; do
+          make CFLAGS="-O1 -g" $(for t in process_iterator util limiter procfs_parse snapshot group list cli_parse lock; do printf 'build/test/%s_test ' $t; done)
+          for t in process_iterator util limiter procfs_parse snapshot group list cli_parse lock; do
             bash tools/ci_run.sh "valgrind $t" valgrind -q --leak-check=full --error-exitcode=99 build/test/${t}_test
           done
       - name: stress test (churn, 300 children, valgrind attach and command mode)

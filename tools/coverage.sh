@@ -15,7 +15,7 @@ mkdir -p "$BUILD"
 # -O0 and no inlining keep the line numbers honest; WERROR stays off, coverage is not a lint run.
 make -s CC="$CC" BUILD="$BUILD" CFLAGS="-O0 -g --coverage -fprofile-update=atomic -DCL_COVERAGE" \
     LDFLAGS="--coverage" all "$BUILD/test/busy" "$BUILD/test/spawn" \
-    $(for t in process_iterator util limiter procfs_parse group list cli_parse lock; do printf '%s ' "$BUILD/test/${t}_test"; done) >/dev/null
+    $(for t in process_iterator util limiter procfs_parse snapshot group list cli_parse lock; do printf '%s ' "$BUILD/test/${t}_test"; done) >/dev/null
 BUILD="$BUILD" sh test/run_tests.sh >"$BUILD/test.log" 2>&1 || { tail -20 "$BUILD/test.log"; echo "coverage: tests failed" >&2; exit 1; }
 BUILD=$(cd "$BUILD" && pwd)
 cd "$BUILD"

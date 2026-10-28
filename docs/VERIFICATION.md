@@ -3,15 +3,15 @@
 
 Everything below is in the repository. CI runs it on every push (current results: the
 [Actions page](https://github.com/denji/cpulimit/actions)). "Local" means a run on a Linux x86_64
-development host; those numbers are from 1.0.2.
+development host; the test, mutation and coverage numbers are from 1.0.3, the benchmark is from 1.0.0.
 
 | Technique | What it checks | Result |
 |---|---|---|
-| `make check` | 11 suites: iterator, utils, controller, parser, process table, list, CLI, lock, CLI end-to-end, 55 integration checks with real processes | passing: gcc and clang `-O2 -Werror`, ASan+UBSan, clang integer sanitizers |
+| `make check` | 12 suites: iterator, utils, controller, parser, process table, snapshot selection, list, CLI, lock, CLI end-to-end, 55 integration checks with real processes | passing: gcc and clang `-O2 -Werror`, ASan+UBSan, clang integer sanitizers |
 | Fuzzing (`make fuzz-standalone`, `make fuzz-libfuzzer`) | `/proc/<pid>/stat` parser and CLI parser with checked properties | standalone driver: 300k+ mutations per target clean locally; libFuzzer jobs pass in CI. The harness found one real bug (below) |
 | `make verif-sim`, `make verif-cbmc` | invariants of the controller, exactness of tick conversion, parser memory safety | simulation passes on every push and found one real bug. CBMC runs in its own workflow (`cbmc.yml`, manual and weekly) and is experimental: it found one real defect (fixed in 1.0.1) but has not yet produced a verdict for the other harnesses, so nothing is claimed proved (see below) |
-| `tools/mutation.sh` | 20 re-introduced defects | 20/20 detected |
-| `tools/coverage.sh` | gcov line/branch coverage, daemon children included | 89.2% lines, 78.6% branches (gate: 85% lines) |
+| `tools/mutation.sh` | 25 re-introduced defects | 25/25 detected |
+| `tools/coverage.sh` | gcov line/branch coverage, daemon children included | 89.6% lines, 79.5% branches (gate: 85% lines) |
 | `make stress` | 15 s fork/exit churn under `-i`, 300 children, no leaks, nothing left stopped, valgrind clean | passing |
 | `make analyze` | `gcc -fanalyzer`, clang-tidy | clean |
 | cppcheck, CodeQL | | pass in CI |

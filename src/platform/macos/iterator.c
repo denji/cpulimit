@@ -33,15 +33,7 @@
 #include <sys/sysctl.h>
 
 #include "platform/iterator.h"
-
-/* One process as seen by the snapshot taken in init_process_iterator(). */
-struct apple_rec {
-    pid_t pid;
-    pid_t ppid;
-    int64_t starttime; /* microseconds since the epoch: constant for the life of a process */
-    int64_t cputime;   /* milliseconds */
-    int selected;      /* part of the answer for this filter */
-};
+#include "platform/snapshot.h"
 
 /* proc_pidinfo() reports CPU time in mach absolute time units: nanoseconds on Intel, but not on
  * Apple silicon, so convert with the timebase. */
@@ -58,7 +50,7 @@ static int64_t mach_to_ms(uint64_t ticks) {
 }
 
 /* 0 on success, -1 when the process is gone, not ours to inspect, or a zombie. */
-static int read_rec(pid_t pid, struct apple_rec *r) {
+static int read_rec(pid_t pid, struct snap_rec *r) {
     struct proc_taskallinfo ti;
     int bytes = proc_pidinfo(pid, PROC_PIDTASKALLINFO, 0, &ti, (int)sizeof(ti));
     if (bytes <= 0 || (size_t)bytes < sizeof(ti)) {
@@ -82,7 +74,7 @@ int init_process_iterator(struct process_iterator *it, struct process_filter *fi
     it->pos = 0;
 
     if (filter->pid != 0 && !filter->include_children) {
-        struct apple_rec *one = (struct apple_rec *)malloc(sizeof(*one));
+        struct snap_rec *one = (struct snap_rec *)malloc(sizeof(*one));
         if (one == NULL) {
             fprintf(stderr, "malloc: %s\n", strerror(errno));
             return -1;
@@ -100,16 +92,16 @@ int init_process_iterator(struct process_iterator *it, struct process_filter *fi
     {
         /* proc_listpids() returns a size in BYTES. Leave room for processes started meanwhile. */
         int bytes = proc_listpids(PROC_ALL_PIDS, 0, NULL, 0);
-        size_t cap, n = 0, i, k;
+        size_t cap, n = 0, i;
         pid_t *pids;
-        struct apple_rec *recs;
+        struct snap_rec *recs;
         if (bytes <= 0) {
             fprintf(stderr, "proc_listpids: %s\n", strerror(errno));
             return -1;
         }
         cap = (size_t)bytes / sizeof(pid_t) + 64;
         pids = (pid_t *)malloc(cap * sizeof(pid_t));
-        recs = (struct apple_rec *)malloc(cap * sizeof(*recs));
+        recs = (struct snap_rec *)malloc(cap * sizeof(*recs));
         if (pids == NULL || recs == NULL) {
             fprintf(stderr, "malloc: %s\n", strerror(errno));
             free(pids);
@@ -130,42 +122,22 @@ int init_process_iterator(struct process_iterator *it, struct process_filter *fi
         }
         free(pids);
 
-        if (filter->pid == 0) {
-            for (i = 0; i < n; i++) {
-                recs[i].selected = 1;
-            }
-        } else {
-            /* the target and every descendant: repeat until no new child is found (a tree is at
-             * most n deep, so n passes always suffice; a pass is cheap next to proc_pidinfo) */
-            int changed = 1;
-            for (i = 0; i < n; i++) {
-                recs[i].selected = (recs[i].pid == filter->pid);
-            }
-            while (changed) {
-                changed = 0;
-                for (i = 0; i < n; i++) {
-                    if (recs[i].selected) {
-                        continue;
-                    }
-                    for (k = 0; k < n; k++) {
-                        if (recs[k].selected && recs[k].pid == recs[i].ppid && recs[i].pid != recs[i].ppid) {
-                            recs[i].selected = 1;
-                            changed = 1;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
         it->recs = recs;
         it->nrecs = n;
+        if (snapshot_select(recs, n, sizeof(*recs), filter->pid, filter->include_children) != 0) {
+            fprintf(stderr, "malloc: %s\n", strerror(errno));
+            free(recs);
+            it->recs = NULL;
+            it->nrecs = 0;
+            return -1;
+        }
     }
     return 0;
 }
 
 int get_next_process(struct process_iterator *it, struct process *p) {
     while (it->pos < it->nrecs) {
-        const struct apple_rec *r = &it->recs[it->pos++];
+        const struct snap_rec *r = &it->recs[it->pos++];
         if (!r->selected) {
             continue;
         }

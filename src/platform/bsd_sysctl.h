@@ -40,6 +40,7 @@
 #include <sys/sysctl.h>
 
 #include "platform/iterator.h"
+#include "platform/snapshot.h"
 
 #if defined __OpenBSD__
 #define BSD_KINFO struct kinfo_proc
@@ -66,11 +67,8 @@
 
 /* One process as seen by the snapshot taken in init_process_iterator(). */
 struct bsd_rec {
-    pid_t pid;
-    pid_t ppid;
-    int64_t starttime; /* microseconds since the epoch: constant for the life of a process */
-    int64_t cputime;   /* milliseconds */
-    int selected;      /* part of the answer for this filter */
+    struct snap_rec s; /* first: snapshot_select() walks the array through it; starttime is in
+                          microseconds since the epoch */
     char comm[KI_MAXCOMLEN];
 };
 
@@ -148,15 +146,15 @@ static int to_rec(const BSD_KINFO *kp, struct bsd_rec *r) {
         return -1;
     }
 #endif
-    r->pid = (pid_t)kp->p_pid;
-    r->ppid = (pid_t)kp->p_ppid;
-    r->starttime = (int64_t)kp->p_ustart_sec * 1000000 + (int64_t)kp->p_ustart_usec;
+    r->s.pid = (pid_t)kp->p_pid;
+    r->s.ppid = (pid_t)kp->p_ppid;
+    r->s.starttime = (int64_t)kp->p_ustart_sec * 1000000 + (int64_t)kp->p_ustart_usec;
     /* CPU time from the statistics ticks: the kernel adds them to a running process at every
      * statistics clock tick. p_rtime is only added to when the process is switched out, so a
      * process that is on a CPU for a whole 100 ms scheduling quantum would be seen using nothing
      * and then twice its share. */
-    r->cputime = (int64_t)(kp->p_uticks + kp->p_sticks + kp->p_iticks) * 1000 / stat_hz();
-    r->selected = 0;
+    r->s.cputime = (int64_t)(kp->p_uticks + kp->p_sticks + kp->p_iticks) * 1000 / stat_hz();
+    r->s.selected = 0;
     memcpy(r->comm, kp->p_comm, sizeof(r->comm));
     r->comm[sizeof(r->comm) - 1] = '\0';
     return 0;
@@ -164,7 +162,7 @@ static int to_rec(const BSD_KINFO *kp, struct bsd_rec *r) {
 
 int init_process_iterator(struct process_iterator *it, struct process_filter *filter) {
     BSD_KINFO *kps;
-    size_t nkp = 0, n = 0, i, k;
+    size_t nkp = 0, n = 0, i;
     struct bsd_rec *recs;
 
     it->filter = filter;
@@ -198,39 +196,15 @@ int init_process_iterator(struct process_iterator *it, struct process_filter *fi
     }
     free(kps);
 
-    if (filter->pid == 0) {
-        for (i = 0; i < n; i++) {
-            recs[i].selected = 1;
-        }
-    } else if (!filter->include_children) {
-        for (i = 0; i < n; i++) {
-            recs[i].selected = (recs[i].pid == filter->pid);
-        }
-    } else {
-        /* the target and every descendant: repeat until no new child is found (a tree is at most
-         * n deep, so n passes always suffice) */
-        int changed = 1;
-        for (i = 0; i < n; i++) {
-            recs[i].selected = (recs[i].pid == filter->pid);
-        }
-        while (changed) {
-            changed = 0;
-            for (i = 0; i < n; i++) {
-                if (recs[i].selected) {
-                    continue;
-                }
-                for (k = 0; k < n; k++) {
-                    if (recs[k].selected && recs[k].pid == recs[i].ppid && recs[i].pid != recs[i].ppid) {
-                        recs[i].selected = 1;
-                        changed = 1;
-                        break;
-                    }
-                }
-            }
-        }
-    }
     it->recs = recs;
     it->nrecs = n;
+    if (snapshot_select(recs, n, sizeof(*recs), filter->pid, filter->include_children) != 0) {
+        fprintf(stderr, "malloc: %s\n", strerror(errno));
+        free(recs);
+        it->recs = NULL;
+        it->nrecs = 0;
+        return -1;
+    }
     return 0;
 }
 
@@ -287,19 +261,19 @@ static int read_argv0(pid_t pid, char *out, size_t outsz) {
 int get_next_process(struct process_iterator *it, struct process *p) {
     while (it->pos < it->nrecs) {
         const struct bsd_rec *r = &it->recs[it->pos++];
-        if (!r->selected) {
+        if (!r->s.selected) {
             continue;
         }
-        p->pid = r->pid;
-        p->ppid = r->ppid;
-        p->starttime = r->starttime;
-        p->cputime = r->cputime;
+        p->pid = r->s.pid;
+        p->ppid = r->s.ppid;
+        p->starttime = r->s.starttime;
+        p->cputime = r->s.cputime;
         p->cpu_usage = -1;
         p->group_seq = 0;
         p->command[0] = '\0';
         if (it->filter->need_command) {
             /* argv[0] as on Linux; the process name when argv cannot be read */
-            if (read_argv0(r->pid, p->command, sizeof(p->command)) != 0) {
+            if (read_argv0(r->s.pid, p->command, sizeof(p->command)) != 0) {
                 strncpy(p->command, r->comm, sizeof(p->command) - 1);
                 p->command[sizeof(p->command) - 1] = '\0';
             }
