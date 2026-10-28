@@ -1,0 +1,67 @@
+<!--meta title="Usage" desc="Every cpulimit option, how to pick a target, exit statuses, signals, lock files and worked examples." section="Start" order="20" -->
+<p class="lead">Exactly one target: a pid (<code>-p</code>), an executable name or path (<code>-e</code>), or a command that cpulimit starts and limits. <code>man cpulimit</code> is the reference; this page adds the reasoning and examples.</p>
+
+<h2 id="synopsis">Synopsis</h2>
+<div class="cp"><pre><code>cpulimit [OPTIONS...] -p PID
+cpulimit [OPTIONS...] -e NAME_OR_PATH
+cpulimit [OPTIONS...] [--] COMMAND [ARGS...]</code></pre></div>
+
+<h2 id="options">Options</h2>
+<div class="tw"><table>
+  <tr><th>Option</th><th>Meaning</th></tr>
+  <tr><td><code>-l, --limit=N</code></td><td>Allowed CPU in percent of <em>one</em> CPU, 0 to 100 × the number of CPUs (150 means one and a half CPUs). Required.</td></tr>
+  <tr><td><code>-p, --pid=N</code></td><td>Limit this pid. Implies <code>-z</code>.</td></tr>
+  <tr><td><code>-e, --exe=FILE</code></td><td>Limit the process whose executable has this name (matched against the basename) or this full path. cpulimit never selects itself.</td></tr>
+  <tr><td><code>-c, --chunk-size=N</code></td><td>Control chunk in microseconds, 1 to 1000000, default 100000. Shorter chunks follow the limit more closely and cost more wake-ups.</td></tr>
+  <tr><td><code>-i, --include-children</code></td><td>Also limit the descendants of the target. They are found again on every cycle, so children started later are picked up.</td></tr>
+  <tr><td><code>-m, --minimum-limited-cpu=M</code></td><td>Processes using less than M of one CPU (<code>0.05</code> means 5 %) are left running instead of being stopped. Note the unit differs from <code>-l</code>. Default 0.</td></tr>
+  <tr><td><code>-z, --lazy</code></td><td>Exit when there is no target or it terminates, instead of waiting for one to appear.</td></tr>
+  <tr><td><code>-d, --daemon</code></td><td>Detach and run in the background. Not valid with a command.</td></tr>
+  <tr><td><code>-s, --syslog</code></td><td>Also send events to syslog, facility <code>LOG_DAEMON</code>.</td></tr>
+  <tr><td><code>-P, --pidfile=FILE</code></td><td>Write the daemon's pid (needs <code>-d</code>). A pid file naming a live process is refused, a stale one is replaced, and it is removed on a normal exit.</td></tr>
+  <tr><td><code>--no-lock</code></td><td>Allow a target that another cpulimit already limits.</td></tr>
+  <tr><td><code>--no-boost</code></td><td>Do not try to raise cpulimit's own scheduling priority.</td></tr>
+  <tr><td><code>-v, -V, -h</code></td><td>Verbose statistics, print the version, print the usage text (<code>-h</code> exits 1, as every release has).</td></tr>
+</table></div>
+<p>Numbers are parsed strictly: <code>-l 5x</code>, <code>-l abc</code>, an empty value, and values out of range are usage errors (exit 1), not silently read as 5 or 0.</p>
+
+<h2 id="examples">Examples</h2>
+<h3>An existing process</h3>
+<div class="cp"><pre><code>cpulimit -l 50 -p 1234          <span class="c"># half a CPU; exits when pid 1234 ends</span>
+cpulimit -l 200 -p 1234         <span class="c"># two CPUs' worth, for a multi-threaded target</span></code></pre></div>
+<h3>By name</h3>
+<div class="cp"><pre><code>cpulimit -l 25 -e ffmpeg        <span class="c"># waits for ffmpeg to appear, limits it</span>
+cpulimit -l 25 -z -e ffmpeg     <span class="c"># exits at once if there is none</span>
+cpulimit -l 25 -i -e make       <span class="c"># make and everything it spawns</span></code></pre></div>
+<h3>A command</h3>
+<div class="cp"><pre><code>cpulimit -l 80 -- make -j8      <span class="c"># exit status is make's</span>
+cpulimit -l 30 -i -- ./build.sh <span class="c"># the script and its children</span></code></pre></div>
+<p>In command mode there is exactly one cpulimit process; the command is its child. Its exit status comes straight from <code>waitpid()</code>, and if it was killed by a signal the raw wait status is returned, as before.</p>
+<h3>As a service</h3>
+<div class="cp"><pre><code>cpulimit -d -s -P /run/cpulimit.pid -l 30 -e backup
+kill "$(cat /run/cpulimit.pid)"   <span class="c"># SIGTERM: releases the target, exits 0</span></code></pre></div>
+
+<h2 id="exit">Exit statuses</h2>
+<div class="tw"><table>
+  <tr><th>Status</th><th>Meaning</th></tr>
+  <tr><td><code>0</code></td><td>Released the target after SIGINT, SIGTERM, SIGHUP or SIGQUIT; <code>-z</code> found no target; <code>-V</code>.</td></tr>
+  <tr><td><code>1</code></td><td>Usage error, a target that is already limited, or a target that is cpulimit itself. Also <code>-h</code>.</td></tr>
+  <tr><td><code>2</code></td><td>The control loop failed (an allocation or a system call).</td></tr>
+  <tr><td>other</td><td>In command mode: the command's own status.</td></tr>
+</table></div>
+
+<h2 id="signals">Signals</h2>
+<p><code>SIGINT</code>, <code>SIGTERM</code>, <code>SIGHUP</code> and <code>SIGQUIT</code> make cpulimit send <code>SIGCONT</code> to every process it has been limiting, then exit. A signal that was already ignored when cpulimit started (for example <code>SIGHUP</code> under <code>nohup</code>) stays ignored. <code>SIGPIPE</code> is ignored, so a closed stdout cannot kill the limiter while a target is stopped.</p>
+
+<h2 id="lock">One limiter per target</h2>
+<p>Two limiters on the same process undo each other's stop and continue, so the second is refused (exit 1) with the pid of the first. The lock is an <code>fcntl</code> record lock in <code>$XDG_RUNTIME_DIR/cpulimit/</code> (or <code>/tmp/cpulimit-&lt;euid&gt;/</code>), keyed on pid and start time. It disappears with its holder, even on <code>SIGKILL</code>, so there are no stale locks. <code>--no-lock</code> overrides it.</p>
+
+<h2 id="permissions">Permissions</h2>
+<p>cpulimit signals the target, so it needs the privilege to do so: the same user, or root. A process it cannot signal is treated like a process that has exited: it is dropped from the group, and the only trace is a line with <code>-v</code> (<code>SIGSTOP failed. Process N dead!</code>). If a limit seems to have no effect on another user's process, run with <code>-v</code> and check for that line.</p>
+<p>Unless <code>--no-boost</code> is given, cpulimit also tries to lower its own nice value so its timing is not delayed by the load it is limiting. This needs privilege; when it is refused, cpulimit carries on and says so only with <code>-v</code>.</p>
+
+<h2 id="choosing">Choosing <code>-c</code> and <code>-m</code></h2>
+<ul>
+  <li>The default chunk of 100 ms is a good start. Shorter chunks smooth the load of the target at the price of more wake-ups; very long chunks make a stalled target visible to users and timeouts.</li>
+  <li><code>-m</code> is for trees with many idle children (<code>-i</code>): idle processes are not worth a stop/continue every chunk, and leaving them running costs nothing because they use almost no CPU.</li>
+</ul>

@@ -1,0 +1,45 @@
+<!--meta title="cpulimit" desc="cpulimit keeps the CPU use of a process near a percentage of one CPU using SIGSTOP/SIGCONT and a feedback controller, on Linux, macOS and the BSDs." -->
+<div class="home">
+<div class="wrap hero">
+  <h1>Limit the CPU of a process without touching its priority.</h1>
+  <p class="lead">cpulimit alternates <code>SIGSTOP</code> and <code>SIGCONT</code> within short chunks and corrects the duty cycle from the CPU time the target actually used, so the limit follows system load. It is made for batch jobs that must not eat the machine.</p>
+  <div class="btns">
+    <a class="btn p" href="install.html">Install</a>
+    <a class="btn" href="usage.html">Usage</a>
+    <a class="btn" href="{{repo}}">Source</a>
+  </div>
+  <p class="ver">Version <strong>{{version}}</strong> · GPL-2.0-or-later · <a href="releases.html">release notes</a></p>
+  <div class="cp"><pre><code><span class="c"># an existing process: half a CPU</span>
+cpulimit -l 50 -p 1234
+<span class="c"># by name, with its children</span>
+cpulimit -l 25 -i -e ffmpeg
+<span class="c"># start a command and limit it; the exit status is the command's</span>
+cpulimit -l 80 -- make -j8
+<span class="c"># background daemon with syslog and a pid file</span>
+cpulimit -d -s -P /run/cpulimit.pid -l 30 -e backup</code></pre></div>
+</div>
+
+<section><div class="wrap">
+  <h2 id="why">Why this one</h2>
+  <p class="sub">A fork of Angelo Marletta's cpulimit, kept compatible with it: the options <code>-p -e -l -c -i -m -v -z</code>, the exit statuses and the log lines are unchanged, so existing scripts keep working.</p>
+  <div class="grid">
+    <div class="card"><h3>Follows the load</h3><p>The next run slice is computed from the CPU time the target really used in the last chunk, not from a fixed duty cycle. <a href="how-it-works.html">How it works</a></p></div>
+    <div class="card"><h3>Never strands a target</h3><p>Every exit path sends <code>SIGCONT</code> first. The one thing no user-space program can survive is <code>SIGKILL</code> of itself; <a href="faq.html#stopped">the FAQ says what to do</a>.</p></div>
+    <div class="card"><h3>Safe identity</h3><p>A process is its pid <em>and</em> start time, so a recycled pid is never limited by mistake, and two limiters cannot fight over one target.</p></div>
+    <div class="card"><h3>Operable</h3><p>Daemon mode with syslog and a pid file, strict option parsing, exit statuses documented in the man page, static musl builds.</p></div>
+    <div class="card"><h3>Tested in the open</h3><p>Unit, integration, fuzz, sanitizer, mutation and model-checking harnesses, with their limits stated. <a href="verification.html">Verification</a></p></div>
+    <div class="card"><h3>Many systems</h3><p>Linux, macOS, FreeBSD, OpenBSD, NetBSD and Solaris/illumos have an iterator; <a href="platforms.html">what is actually tested where</a> is spelled out.</p></div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <h2 id="start">Get started</h2>
+  <div class="two">
+    <div class="cp"><pre><code>git clone {{repo}}.git
+cd cpulimit
+make &amp;&amp; sudo make install
+cpulimit -l 30 -- gzip -9 big.tar</code></pre></div>
+    <p class="sub" style="margin:0">GNU make and a C compiler are all it takes (<code>gmake</code> on the BSDs and illumos). <a href="install.html">Install</a> covers static builds, packaging variables and the platform notes; <a href="usage.html">Usage</a> has every option, the exit statuses and worked examples.</p>
+  </div>
+</div></section>
+</div>

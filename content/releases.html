@@ -1,0 +1,16 @@
+<!--meta title="Releases" desc="Release history of cpulimit with a summary of each version, and how to verify a download." section="Project" order="20" -->
+<p class="lead">The full history is <a href="{{repo}}/blob/master/CHANGELOG.md">CHANGELOG.md</a>. The command-line interface and the exit statuses documented in <code>man cpulimit</code> are the public interface that 1.x keeps stable (<a href="https://semver.org/">semantic versioning</a>).</p>
+
+<div class="grid">
+  <div class="card"><h3>{{version}} <span class="tag">{{date}}</span></h3><p>OpenBSD and NetBSD support, one shared selection of a process and its descendants for all iterators, a FreeBSD iterator that follows the whole tree under <code>-i</code> (it stopped at the direct children before), clang-format, a wider CI matrix of virtual machines. Options, exit statuses and log text unchanged.</p></div>
+  <div class="card"><h3>1.0.2 <span class="tag">2026-10-24</span></h3><p>Source tree reorganized by role, CI and benchmark workflows repaired, CBMC moved to its own workflow. No change to options, exit statuses or log text.</p></div>
+  <div class="card"><h3>1.0.1 <span class="tag">2026-10-22</span></h3><p>The bounded model checker found a real defect: <code>compute_slices()</code> computed <code>0 / NaN</code> and cleaned it up afterwards. It now never produces a NaN; the result is identical for every input. Verification harnesses reworked.</p></div>
+  <div class="card"><h3>1.0.0 <span class="tag">2026-10-21</span></h3><p>First release of the fork: daemon mode, syslog, pid file, single-limiter lock, single-process command mode, strict option parsing, pid and start-time identity, a rewritten <code>/proc</code> reader, a non-recursive build, GitHub Actions instead of Travis.</p></div>
+</div>
+<p>Moving between versions: <a href="upgrading.html">Upgrading</a>.</p>
+
+<h2 id="verify">Verify a download</h2>
+<p>Release assets are static musl binaries named <code>cpulimit-ARCH-linux-musl</code>, each with a <code>.sha256</code> file. The release workflow has not produced a release yet; if the <a href="{{repo}}/releases">releases page</a> lists assets, check them like this:</p>
+<div class="cp"><pre><code>sha256sum -c cpulimit-x86_64-linux-musl.sha256
+chmod +x cpulimit-x86_64-linux-musl &amp;&amp; ./cpulimit-x86_64-linux-musl -V</code></pre></div>
+<p>The checksum guards against a damaged download, not against a compromised release page. Building from source remains the reference: <code>make &amp;&amp; make check &amp;&amp; sudo make install</code>.</p>

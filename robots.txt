@@ -1,2 +1,3 @@
 User-agent: *
 Allow: /
+Sitemap: https://denji.github.io/cpulimit/sitemap.xml

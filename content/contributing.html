@@ -1,0 +1,33 @@
+<!--meta title="Contributing" desc="How to build, test, format and submit a change to cpulimit, and how to add a platform." section="Project" order="30" -->
+<p class="lead">Bug fixes, tests and ports are welcome. A change should come with a test that fails without it.</p>
+
+<h2 id="checks">Before you send a change</h2>
+<div class="cp"><pre><code>make check analyze verif-sim format-check</code></pre></div>
+<ul>
+  <li><code>make check</code>: unit, CLI and integration tests (<code>SKIP_INTEGRATION=1</code> for the unit tests only).</li>
+  <li><code>make analyze</code>: <code>gcc -fanalyzer</code>, which must be silent, and clang-tidy.</li>
+  <li><code>make verif-sim</code>: the model-checking harnesses as random tests.</li>
+  <li><code>make format-check</code>: <code>.clang-format</code> (4 spaces, attached braces, <code>char *p</code>, 120 columns). <code>make format</code> rewrites files. CI pins clang-format 18, because the output differs between major versions.</li>
+  <li>If you changed the controller, the process table or an iterator, also run <code>sh tools/mutation.sh</code>; every mutant must still be killed, and a new defect class deserves a new mutant in <code>tools/mutants.txt</code>.</li>
+</ul>
+
+<h2 id="rules">Rules of the code base</h2>
+<ul>
+  <li><strong>Architecture first.</strong> The module rules and invariants in <a href="{{repo}}/blob/master/docs/ARCHITECTURE.md">ARCHITECTURE.md</a> are normative: a change that breaks one changes that document in the same commit. Only <code>src/main.c</code> calls <code>exit()</code>; only <code>src/platform/*/iterator.c</code> knows an operating system.</li>
+  <li><strong>Compatibility.</strong> Options, exit statuses and log text are the public interface of 1.x. A change a script could notice is listed in <a href="upgrading.html">Upgrading</a> and the changelog.</li>
+  <li><strong>Say what is not tested.</strong> Code that was written without a host to run it on is labelled that way in the source, the changelog and <a href="platforms.html">Platforms</a>. A claim in the docs is a statement about a run that happened.</li>
+  <li><strong>Original code.</strong> Contributions are GPL-2.0-or-later. New files carry the copyright and <code>SPDX-License-Identifier: GPL-2.0-or-later</code> header used in the tree; contributors are credited in <code>AUTHORS</code>.</li>
+</ul>
+
+<h2 id="port">Adding a platform</h2>
+<ol>
+  <li>Create <code>src/platform/&lt;os&gt;/iterator.c</code> with <code>init_process_iterator</code>, <code>get_next_process</code> and <code>close_process_iterator</code>, and add its branch to <code>src/platform/iterator.c</code> and the fields it needs to <code>struct process_iterator</code> in <code>iterator.h</code>.</li>
+  <li>Fill <code>struct process</code>: pid, parent pid, a start time that is stable for the life of a process and only ever compared for equality, and CPU time in milliseconds. Document the units in <code>iterator.h</code>.</li>
+  <li>Copy the processes into an array whose records start with <code>struct snap_rec</code> and call <code>snapshot_select(recs, n, sizeof(*recs), filter->pid, filter->include_children)</code>.</li>
+  <li>Skip zombies and kernel threads. Check what your kernel really reports for them: OpenBSD listed zombies, and a limiter that waits for them never finishes.</li>
+  <li>Check how the CPU clock advances. A counter that only moves when a process is switched out (OpenBSD's <code>p_rtime</code>) makes the controller see steps, not a rate.</li>
+  <li>Add a job to <code>.github/workflows/vm.yml</code> if a VM exists for it (<code>tools/vm_build.sh</code> builds and tests inside the guest and keeps the transcript), and update <a href="platforms.html">Platforms</a> with what actually ran.</li>
+</ol>
+
+<h2 id="patch">Sending a change</h2>
+<p>Open a pull request at <a href="{{repo}}">GitHub</a>, or send a patch from <code>git format-patch</code>. Keep commits focused, explain the reason and the evidence (which test fails before and passes after) in the message, and do not mix a reformat with a behaviour change.</p>

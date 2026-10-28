@@ -44,7 +44,7 @@
     ]
   },
   "coverage": {
-    "source": "tools/coverage.sh (gcov), 2026-10-24, make coverage on 1.0.2 including daemon children",
+    "source": "tools/coverage.sh (gcov), 2026-10-28, make coverage on 1.0.3 including daemon children",
     "gate_lines": 85,
     "files": [
       {
@@ -56,6 +56,11 @@
         "name": "core/list.c",
         "lines": 100.0,
         "branches": 100.0
+      },
+      {
+        "name": "platform/snapshot.c",
+        "lines": 100.0,
+        "branches": 97.5
       },
       {
         "name": "platform/procfs_parse.c",
@@ -78,14 +83,14 @@
         "branches": 61.1
       },
       {
-        "name": "platform/iterator.c",
-        "lines": 89.1,
-        "branches": 78.9
-      },
-      {
         "name": "core/limiter.c",
         "lines": 88.9,
         "branches": 83.3
+      },
+      {
+        "name": "platform/iterator.c",
+        "lines": 88.7,
+        "branches": 77.4
       },
       {
         "name": "runtime/lock.c",
@@ -94,7 +99,7 @@
       },
       {
         "name": "main.c",
-        "lines": 80.3,
+        "lines": 80.1,
         "branches": 68.3
       },
       {
@@ -103,7 +108,7 @@
         "branches": 55.3
       }
     ],
-    "total_lines": 89.2,
-    "total_branches": 78.6
+    "total_lines": 89.6,
+    "total_branches": 79.5
   }
 }

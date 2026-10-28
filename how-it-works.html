@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>How it works · cpulimit</title>
+<meta name="description" content="The control loop, the controller, process identity, signals and the per-platform process iterators of cpulimit.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="canonical" href="https://denji.github.io/cpulimit/how-it-works.html">
+<link rel="stylesheet" href="style.css">
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><div class="wrap">
+  <a class="brand" href="./">cpulimit</a>
+  <nav aria-label="Main"><a href="install.html">Install</a><a href="usage.html">Usage</a><a href="faq.html">FAQ</a><a href="releases.html">Releases</a><a href="https://github.com/denji/cpulimit">GitHub</a></nav>
+  <div class="search"><input id="q" type="search" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off"><ul id="hits" hidden></ul></div>
+  <button id="theme" type="button" aria-label="Toggle colour theme">theme</button>
+</div></header>
+<div class="wrap docs"><nav class="side" aria-label="Documentation"><h2>Start</h2><ul><li><a href="install.html">Install</a></li><li><a href="usage.html">Usage</a></li></ul><h2>Reference</h2><ul><li><a href="how-it-works.html" aria-current="page">How it works</a></li><li><a href="platforms.html">Platforms</a></li><li><a href="verification.html">Verification</a></li><li><a href="faq.html">FAQ and troubleshooting</a></li></ul><h2>Project</h2><ul><li><a href="upgrading.html">Upgrading</a></li><li><a href="releases.html">Releases</a></li><li><a href="contributing.html">Contributing</a></li></ul></nav><main id="main"><article class="doc"><h1>How it works</h1><p class="lead">cpulimit does not change priorities or scheduling classes. It lets the target run for part of a short chunk and stops it for the rest, and adjusts the split after every chunk from the CPU time the target really used.</p>
+
+<h2 id="loop">The control loop</h2>
+<p>One iteration, repeated for as long as there is a target:</p>
+<ol>
+  <li>Update the process table and compute each process's CPU usage since the last cycle.</li>
+  <li>Compute the slices: <code>compute_slices(limit, usage, previous rate, chunk)</code> returns a work slice and a stop slice that add up to the chunk (default 100 ms).</li>
+  <li>Send <code>SIGCONT</code> to everything, wait for the work slice, send <code>SIGSTOP</code> (skipping processes below the <code>-m</code> threshold), wait for the stop slice.</li>
+</ol>
+<figure>
+  <svg class="duty" viewBox="0 0 720 96" role="img" aria-label="Three chunks, each a run slice followed by a stop slice; the run slice shrinks as measured usage exceeds the limit">
+    <line class="ln" x1="10" y1="60" x2="710" y2="60"/>
+    <g><rect class="run" x="10" y="26" width="140" height="34"/><rect class="stop" x="150" y="26" width="80" height="34"/>
+       <rect class="run" x="240" y="26" width="110" height="34"/><rect class="stop" x="350" y="26" width="110" height="34"/>
+       <rect class="run" x="470" y="26" width="100" height="34"/><rect class="stop" x="570" y="26" width="140" height="34"/></g>
+    <text x="14" y="18">chunk 1: SIGCONT</text><text x="154" y="18">SIGSTOP</text>
+    <text x="244" y="18">chunk 2</text><text x="474" y="18">chunk 3</text>
+    <text x="14" y="84">measured usage above the limit, so each next run slice is shorter</text>
+  </svg>
+  <figcaption>Illustration of the idea, not measured data.</figcaption>
+</figure>
+
+<h3 id="controller">The controller</h3>
+<p>The controller is a pure function, <code>compute_slices</code>, with four invariants that are tested exhaustively on a grid and are the target of the bounded model checker:</p>
+<ol>
+  <li><code>0 ≤ work ≤ chunk</code> and <code>work + stop = chunk</code>;</li>
+  <li>the rate is in <code>[0, 1]</code> and never NaN;</li>
+  <li>no floating-point exception for any finite input;</li>
+  <li>where the older formula was well defined, the result agrees with it to 1 ns.</li>
+</ol>
+<p>Accuracy is a property of this controller, shared with the original program: both under-deliver at low limits and overshoot near 50 % (<a href="verification.html#measurements">measurements</a>).</p>
+
+<h2 id="identity">Process identity</h2>
+<p>A process is the pair (pid, start time). A new process that reuses a pid is a new entry, so a recycled pid is never limited by mistake (the original asserted and aborted). Each update stamps the entries it sees with a generation number and frees the rest, so the table is as large as the number of live processes and no larger. Every allocation is checked, and the unit tests fail the k-th allocation for every k to prove the table stays valid and leak-free.</p>
+
+<h2 id="signals">Signals and shutdown</h2>
+<p>The handler for <code>SIGINT</code>, <code>SIGTERM</code>, <code>SIGHUP</code> and <code>SIGQUIT</code> only stores the signal number in a <code>volatile sig_atomic_t</code>. The four signals are blocked except inside the wait, which is a <code>pselect()</code> with the original mask, so a signal can neither be lost between checking the flag and sleeping nor delay shutdown by more than one wake-up. <code>sleep()</code> and <code>nanosleep()</code> alone cannot close that race.</p>
+<div class="callout"><strong>Invariant: never strand a target.</strong> Whenever the control loop is left for any reason (target ended, signal, allocation failure, error), every process cpulimit may have stopped receives <code>SIGCONT</code> before exit. The exception is outside the program's power: <code>SIGKILL</code>, an OOM kill or a crash during a stop slice leaves the target stopped (<a href="faq.html#stopped">what to do</a>).</div>
+<p>Timing uses <code>CLOCK_MONOTONIC</code>, so wall-clock steps cannot distort the duty cycle.</p>
+
+<h2 id="iterators">Process iterators</h2>
+<p>Everything that knows how an operating system lists processes lives in <code>src/platform/&lt;os&gt;/iterator.c</code>; nothing else includes platform code, and a new platform is one file plus a branch in <code>src/platform/iterator.c</code>. The iterator answers one question: <em>which processes does this filter select, and how much CPU has each used?</em></p>
+<div class="tw"><table>
+  <tr><th>System</th><th>Source of the data</th><th>CPU time</th><th>Identity (start time)</th></tr>
+  <tr><td>Linux</td><td><code>/proc/&lt;pid&gt;/stat</code>, parsed by a fuzzed, allocation-free parser</td><td>utime + stime clock ticks</td><td>ticks since boot</td></tr>
+  <tr><td>macOS</td><td><code>proc_listpids</code> and <code>proc_pidinfo</code></td><td>mach time, converted with the timebase (not nanoseconds on Apple silicon)</td><td>µs since the epoch</td></tr>
+  <tr><td>FreeBSD</td><td><code>kvm_getprocs</code> (no group membership needed)</td><td><code>ki_runtime</code>, µs</td><td>µs since the epoch</td></tr>
+  <tr><td>OpenBSD</td><td><code>sysctl kern.proc</code>, no libkvm</td><td>statistics tick counters (<code>p_uticks + p_sticks + p_iticks</code>)</td><td>µs since the epoch</td></tr>
+  <tr><td>NetBSD</td><td><code>sysctl kern.proc2</code>, shares the OpenBSD code</td><td>the same tick counters</td><td>µs since the epoch</td></tr>
+  <tr><td>Solaris, illumos</td><td><code>/proc/&lt;pid&gt;/psinfo</code></td><td><code>pr_time</code>, ns</td><td>seconds</td></tr>
+</table></div>
+<p>On OpenBSD the obvious field, <code>p_rtime</code>, is wrong for this purpose: the kernel only adds to it when a process is switched out, so a process that holds the CPU for a whole scheduling quantum appears to use nothing and then twice its share. The iterator reads the statistics tick counters instead, which the kernel advances on every statistics clock tick.</p>
+
+<h3 id="snapshot">Snapshots and the process tree</h3>
+<p>The Linux, macOS, FreeBSD, OpenBSD and NetBSD iterators copy the processes into a snapshot when they start and then yield from it, so the answer is consistent even while processes come and go. The selection of "the target and all its descendants" (<code>-i</code>) is one shared function, <code>snapshot_select()</code> in <code>src/platform/snapshot.c</code>: it sorts an index by parent pid and walks it breadth first, O(n log n), visiting each record once, so a pid that is its own parent cannot loop. Zombies and kernel threads are never reported: they cannot use CPU.</p>
+
+<h2 id="more">Further reading</h2>
+<p>The normative description, including the module rules and the lock protocol, is <a href="https://github.com/denji/cpulimit/blob/master/docs/ARCHITECTURE.md">docs/ARCHITECTURE.md</a> in the repository; a change that breaks a rule there has to change that document in the same commit.</p>
+<nav class="pager" aria-label="Previous and next page"><a rel="prev" href="usage.html"><small>Previous</small>Usage</a><a rel="next" href="platforms.html"><small>Next</small>Platforms</a></nav></article><nav class="toc" aria-label="On this page"><strong>On this page</strong><ul><li><a href="#loop">The control loop</a></li><li><a href="#identity">Process identity</a></li><li><a href="#signals">Signals and shutdown</a></li><li><a href="#iterators">Process iterators</a></li><li><a href="#more">Further reading</a></li></ul></nav></main></div>
+<footer><div class="wrap">
+  <p>cpulimit 1.0.3 · GPL-2.0-or-later · <a href="https://github.com/denji/cpulimit/blob/master/CHANGELOG.md">changelog</a> · <a href="https://github.com/denji/cpulimit/issues">report a problem</a>. Page <a href="https://github.com/denji/cpulimit/blob/gh-pages/content/how-it-works.html">source</a>.</p>
+  <p>Originally by Angelo Marletta; this fork is maintained at <a href="https://github.com/denji/cpulimit">denji/cpulimit</a>. Contributors: <a href="https://github.com/denji/cpulimit/blob/master/AUTHORS">AUTHORS</a>. The site is built from <code>content/</code>, <code>site.json</code> and <code>data/results.json</code> by <code>tools/build.py</code>.</p>
+</div></footer>
+<script src="site.js" defer></script>
+</body>
+</html>

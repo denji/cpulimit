@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Contributing · cpulimit</title>
+<meta name="description" content="How to build, test, format and submit a change to cpulimit, and how to add a platform.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="canonical" href="https://denji.github.io/cpulimit/contributing.html">
+<link rel="stylesheet" href="style.css">
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><div class="wrap">
+  <a class="brand" href="./">cpulimit</a>
+  <nav aria-label="Main"><a href="install.html">Install</a><a href="usage.html">Usage</a><a href="faq.html">FAQ</a><a href="releases.html">Releases</a><a href="https://github.com/denji/cpulimit">GitHub</a></nav>
+  <div class="search"><input id="q" type="search" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off"><ul id="hits" hidden></ul></div>
+  <button id="theme" type="button" aria-label="Toggle colour theme">theme</button>
+</div></header>
+<div class="wrap docs"><nav class="side" aria-label="Documentation"><h2>Start</h2><ul><li><a href="install.html">Install</a></li><li><a href="usage.html">Usage</a></li></ul><h2>Reference</h2><ul><li><a href="how-it-works.html">How it works</a></li><li><a href="platforms.html">Platforms</a></li><li><a href="verification.html">Verification</a></li><li><a href="faq.html">FAQ and troubleshooting</a></li></ul><h2>Project</h2><ul><li><a href="upgrading.html">Upgrading</a></li><li><a href="releases.html">Releases</a></li><li><a href="contributing.html" aria-current="page">Contributing</a></li></ul></nav><main id="main"><article class="doc"><h1>Contributing</h1><p class="lead">Bug fixes, tests and ports are welcome. A change should come with a test that fails without it.</p>
+
+<h2 id="checks">Before you send a change</h2>
+<div class="cp"><pre><code>make check analyze verif-sim format-check</code></pre></div>
+<ul>
+  <li><code>make check</code>: unit, CLI and integration tests (<code>SKIP_INTEGRATION=1</code> for the unit tests only).</li>
+  <li><code>make analyze</code>: <code>gcc -fanalyzer</code>, which must be silent, and clang-tidy.</li>
+  <li><code>make verif-sim</code>: the model-checking harnesses as random tests.</li>
+  <li><code>make format-check</code>: <code>.clang-format</code> (4 spaces, attached braces, <code>char *p</code>, 120 columns). <code>make format</code> rewrites files. CI pins clang-format 18, because the output differs between major versions.</li>
+  <li>If you changed the controller, the process table or an iterator, also run <code>sh tools/mutation.sh</code>; every mutant must still be killed, and a new defect class deserves a new mutant in <code>tools/mutants.txt</code>.</li>
+</ul>
+
+<h2 id="rules">Rules of the code base</h2>
+<ul>
+  <li><strong>Architecture first.</strong> The module rules and invariants in <a href="https://github.com/denji/cpulimit/blob/master/docs/ARCHITECTURE.md">ARCHITECTURE.md</a> are normative: a change that breaks one changes that document in the same commit. Only <code>src/main.c</code> calls <code>exit()</code>; only <code>src/platform/*/iterator.c</code> knows an operating system.</li>
+  <li><strong>Compatibility.</strong> Options, exit statuses and log text are the public interface of 1.x. A change a script could notice is listed in <a href="upgrading.html">Upgrading</a> and the changelog.</li>
+  <li><strong>Say what is not tested.</strong> Code that was written without a host to run it on is labelled that way in the source, the changelog and <a href="platforms.html">Platforms</a>. A claim in the docs is a statement about a run that happened.</li>
+  <li><strong>Original code.</strong> Contributions are GPL-2.0-or-later. New files carry the copyright and <code>SPDX-License-Identifier: GPL-2.0-or-later</code> header used in the tree; contributors are credited in <code>AUTHORS</code>.</li>
+</ul>
+
+<h2 id="port">Adding a platform</h2>
+<ol>
+  <li>Create <code>src/platform/&lt;os&gt;/iterator.c</code> with <code>init_process_iterator</code>, <code>get_next_process</code> and <code>close_process_iterator</code>, and add its branch to <code>src/platform/iterator.c</code> and the fields it needs to <code>struct process_iterator</code> in <code>iterator.h</code>.</li>
+  <li>Fill <code>struct process</code>: pid, parent pid, a start time that is stable for the life of a process and only ever compared for equality, and CPU time in milliseconds. Document the units in <code>iterator.h</code>.</li>
+  <li>Copy the processes into an array whose records start with <code>struct snap_rec</code> and call <code>snapshot_select(recs, n, sizeof(*recs), filter->pid, filter->include_children)</code>.</li>
+  <li>Skip zombies and kernel threads. Check what your kernel really reports for them: OpenBSD listed zombies, and a limiter that waits for them never finishes.</li>
+  <li>Check how the CPU clock advances. A counter that only moves when a process is switched out (OpenBSD's <code>p_rtime</code>) makes the controller see steps, not a rate.</li>
+  <li>Add a job to <code>.github/workflows/vm.yml</code> if a VM exists for it (<code>tools/vm_build.sh</code> builds and tests inside the guest and keeps the transcript), and update <a href="platforms.html">Platforms</a> with what actually ran.</li>
+</ol>
+
+<h2 id="patch">Sending a change</h2>
+<p>Open a pull request at <a href="https://github.com/denji/cpulimit">GitHub</a>, or send a patch from <code>git format-patch</code>. Keep commits focused, explain the reason and the evidence (which test fails before and passes after) in the message, and do not mix a reformat with a behaviour change.</p>
+<nav class="pager" aria-label="Previous and next page"><a rel="prev" href="releases.html"><small>Previous</small>Releases</a><span></span></nav></article><nav class="toc" aria-label="On this page"><strong>On this page</strong><ul><li><a href="#checks">Before you send a change</a></li><li><a href="#rules">Rules of the code base</a></li><li><a href="#port">Adding a platform</a></li><li><a href="#patch">Sending a change</a></li></ul></nav></main></div>
+<footer><div class="wrap">
+  <p>cpulimit 1.0.3 · GPL-2.0-or-later · <a href="https://github.com/denji/cpulimit/blob/master/CHANGELOG.md">changelog</a> · <a href="https://github.com/denji/cpulimit/issues">report a problem</a>. Page <a href="https://github.com/denji/cpulimit/blob/gh-pages/content/contributing.html">source</a>.</p>
+  <p>Originally by Angelo Marletta; this fork is maintained at <a href="https://github.com/denji/cpulimit">denji/cpulimit</a>. Contributors: <a href="https://github.com/denji/cpulimit/blob/master/AUTHORS">AUTHORS</a>. The site is built from <code>content/</code>, <code>site.json</code> and <code>data/results.json</code> by <code>tools/build.py</code>.</p>
+</div></footer>
+<script src="site.js" defer></script>
+</body>
+</html>

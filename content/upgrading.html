@@ -1,0 +1,28 @@
+<!--meta title="Upgrading" desc="What changes when moving to this cpulimit from the original 0.2.x or 0.3.2, or from an earlier 1.x release." section="Project" order="10" -->
+<p class="lead">Log lines, exit statuses and the options <code>-p -e -l -c -i -m -v -z</code> are unchanged from the original, so existing scripts keep working. These are the differences a script or an operator can notice.</p>
+
+<h2 id="from-1-0-2">From 1.0.2 to 1.0.3</h2>
+<ul>
+  <li>Nothing to change. Options, exit statuses and log text are the same, and the controller is the same.</li>
+  <li><strong>FreeBSD:</strong> <code>-i</code> now limits the whole tree. It used to limit only the direct children of the target, so grandchildren ran free. If you relied on that, limit the child you want by pid instead.</li>
+  <li><strong>New systems:</strong> OpenBSD and NetBSD build and run; see <a href="platforms.html">Platforms</a> for how far each is tested.</li>
+</ul>
+
+<h2 id="from-original">From the original cpulimit (0.2.x, 0.3.2)</h2>
+<div class="tw"><table>
+  <tr><th>Area</th><th>Original</th><th>1.x</th></tr>
+  <tr><td>Option values</td><td><code>atoi</code>: <code>-l 5x</code> and <code>-l abc</code> were accepted, and <code>-m</code> could crash</td><td>strict parsing with ranges; <code>-c 0</code> and <code>-c 1000000</code> or more are rejected instead of spinning or failing in <code>nanosleep</code></td></tr>
+  <tr><td>Command mode</td><td>a separate limiter process that could outlive its parent</td><td>one process; the exit status is the command's</td></tr>
+  <tr><td>Two limiters, one target</td><td>allowed; they undo each other's <code>SIGSTOP</code>/<code>SIGCONT</code></td><td>the second is refused (exit 1) and names the first; <code>--no-lock</code> restores the old behaviour</td></tr>
+  <tr><td>Process identity</td><td>pid only: a reused pid was limited as if it were the target</td><td>pid and start time</td></tr>
+  <tr><td>Signals</td><td>handled in the handler; a signal could be lost before the wait</td><td>flag-only handler; signals blocked except inside <code>pselect()</code></td></tr>
+  <tr><td>Clock</td><td>wall clock</td><td><code>CLOCK_MONOTONIC</code></td></tr>
+  <tr><td>New options</td><td>none</td><td><code>-d</code>, <code>-s</code>, <code>-P</code>, <code>--no-lock</code>, <code>--no-boost</code>, <code>-V</code>, and long options for all</td></tr>
+  <tr><td>Build</td><td>recursive Makefiles, Travis CI</td><td>one Makefile, GitHub Actions</td></tr>
+</table></div>
+<p>Control accuracy is the same: both versions use one controller, and both under-deliver at low limits and overshoot near 50 %. The gain is the lower cost of the limiter itself (<a href="verification.html#measurements">measurements</a>).</p>
+
+<h2 id="check">Checking an upgrade</h2>
+<div class="cp"><pre><code>cpulimit -V                                 <span class="c"># version</span>
+cpulimit -l 50 -- sh -c 'exit 7'; echo $?   <span class="c"># 7: the command's status is passed through</span>
+cpulimit -l 5x -p 1234 ; echo $?            <span class="c"># 1: strict option parsing</span></code></pre></div>

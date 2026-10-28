@@ -1,0 +1,42 @@
+<!--meta title="FAQ and troubleshooting" desc="Answers to the common questions about cpulimit: a stopped process, a limit that does not hold, permissions, threads, containers." section="Reference" order="40" -->
+<h2 id="stopped">A process stays stopped after cpulimit died</h2>
+<p>If cpulimit is killed with <code>SIGKILL</code>, or by the out-of-memory killer, or crashes while the target is in its stop slice, the target stays stopped (state <code>T</code> in <code>ps</code>). No user-space program can prevent this; a supervising process could, but it would bring back the original's orphaned-limiter defect. Resume the target:</p>
+<div class="cp"><pre><code>kill -CONT 1234
+pkill -CONT -f 'the command line'     <span class="c"># or by name</span></code></pre></div>
+<p>A normal stop of cpulimit (<code>SIGINT</code>, <code>SIGTERM</code>, <code>SIGHUP</code>, <code>SIGQUIT</code>, the target exiting, an error) always sends <code>SIGCONT</code> first. Use those, not <code>SIGKILL</code>, to stop a limiter.</p>
+
+<h2 id="no-effect">The limit seems to have no effect</h2>
+<ul>
+  <li><strong>Another user's process.</strong> If cpulimit cannot signal it, it drops it as if it had exited. Run with <code>-v</code> and look for <code>SIGSTOP failed. Process N dead!</code>; run as that user or as root.</li>
+  <li><strong>The percentage is of one CPU.</strong> <code>-l 50</code> on a program using four threads still allows half a CPU in total; <code>-l 200</code> allows two.</li>
+  <li><strong>The children are not included.</strong> A shell script's work happens in its children: add <code>-i</code>.</li>
+  <li><strong><code>-m</code> is too high.</strong> Processes using less than M of a CPU are never stopped. Remember <code>-m 0.05</code> is 5 %, not <code>-m 5</code>.</li>
+  <li><strong>Wrong pid.</strong> <code>-p</code> exits when the pid ends (it implies <code>-z</code>); <code>-e</code> waits for a match unless <code>-z</code> is given.</li>
+</ul>
+
+<h2 id="refused">"already limited" and exit status 1</h2>
+<p>Another cpulimit holds the lock for that process (see <a href="usage.html#lock">one limiter per target</a>). The message names its pid. Stop that one, or pass <code>--no-lock</code> if you really want two limiters; they will undo each other's stop and continue and the result is not a clean limit.</p>
+
+<h2 id="accuracy">How accurate is it?</h2>
+<p>Within a few points of the requested share on a quiet machine, with the same bias as the original: it delivers slightly less than asked at 10 % to 25 % and overshoots by a point or two near 50 %. See the <a href="verification.html#measurements">measurements</a>. Shorter chunks (<code>-c</code>) track the limit more closely and cost more wake-ups. On a busy or emulated machine the CPU accounting itself is coarse (one clock tick, 10 ms at 100 Hz), and so is the limit.</p>
+
+<h2 id="threads">Does it limit threads separately?</h2>
+<p>No. The target is limited as a whole: the signals go to the process, so all of its threads stop and continue together. A two-thread busy loop at <code>-l 50</code> measured 53 to 54 % of one CPU over 10 s, with the old and the new binary alike.</p>
+
+<h2 id="vs">Why not nice, cgroups or a scheduler class?</h2>
+<p><code>nice</code> only changes who wins when the CPU is contended; an idle machine still gives the process all of it. cgroup CPU quotas (<code>cpu.max</code>, <code>systemd-run -p CPUQuota=</code>) are the right tool on Linux when you control the service and have the privilege; they are enforced by the kernel and need no cpulimit process. cpulimit is for the cases where those are unavailable or too heavy: an already running process, another unix, a user without cgroup delegation, or a quick cap on one command.</p>
+
+<h2 id="containers">Containers</h2>
+<p>cpulimit sees the processes of the PID namespace it runs in. To limit a container's process from the host, use the host pid; from inside, the container's. A cgroup CPU quota on the container applies in addition to the limit.</p>
+
+<h2 id="start-time">Pid reuse</h2>
+<p>A process is the pair (pid, start time); when a pid is recycled for a new process, cpulimit sees a new entry and does not limit it. A window of one control cycle remains between reading a process and signalling it, which no user-space program can close.</p>
+
+<h2 id="exit-help">Why does <code>-h</code> exit with 1?</h2>
+<p>Every release of cpulimit has, and scripts may depend on it. <code>-V</code> exits 0.</p>
+
+<h2 id="daemon-log">Where does a daemon log?</h2>
+<p>To standard output and error as long as they exist, and with <code>-s</code> to syslog (facility <code>LOG_DAEMON</code>). A daemon detaches from the terminal, so use <code>-s</code> to keep a record.</p>
+
+<h2 id="report">Reporting a problem</h2>
+<p>Open an issue at <a href="{{repo}}/issues">GitHub</a> with the version (<code>cpulimit -V</code>), the system, the command line and, for a limit that does not hold, the output of the same command with <code>-v</code>.</p>

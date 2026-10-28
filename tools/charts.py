@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Render the charts of index.html from data/results.json.
+"""Charts of the site, drawn from data/results.json.
 
-    python3 tools/charts.py          rewrite the blocks between <!--chart:NAME--> and <!--/chart-->
+    tools/build.py calls CHARTS[name]() for every <!--chart:NAME--> marker in content/*.html
 
 The charts are inline SVG that take their colours from the CSS variables of style.css, so they
 follow the light/dark theme. Every number comes from data/results.json, which records where it
 was measured; nothing is drawn that is not in that file. Standard library only."""
-import json, re, sys
+import json
 from html import escape
 
 ROOT = __file__.rsplit('/', 2)[0] if '/' in __file__ else '.'
@@ -102,17 +102,3 @@ def coverage():
 
 
 CHARTS = {'accuracy': accuracy, 'overhead': overhead, 'coverage': coverage}
-
-def main():
-    path = f'{ROOT}/index.html'
-    html = open(path).read()
-    for name, fn in CHARTS.items():
-        pat = re.compile(rf'(<!--chart:{name}-->)(.*?)(<!--/chart-->)', re.S)
-        if not pat.search(html):
-            sys.exit(f'marker for chart "{name}" not found in index.html')
-        html = pat.sub(lambda m: m.group(1) + fn() + m.group(3), html, count=1)
-    open(path, 'w').write(html)
-    print('charts written:', ', '.join(CHARTS))
-
-if __name__ == '__main__':
-    main()

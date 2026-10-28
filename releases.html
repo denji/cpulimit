@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Releases · cpulimit</title>
+<meta name="description" content="Release history of cpulimit with a summary of each version, and how to verify a download.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="canonical" href="https://denji.github.io/cpulimit/releases.html">
+<link rel="stylesheet" href="style.css">
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><div class="wrap">
+  <a class="brand" href="./">cpulimit</a>
+  <nav aria-label="Main"><a href="install.html">Install</a><a href="usage.html">Usage</a><a href="faq.html">FAQ</a><a href="releases.html">Releases</a><a href="https://github.com/denji/cpulimit">GitHub</a></nav>
+  <div class="search"><input id="q" type="search" placeholder="Search the docs" aria-label="Search the docs" autocomplete="off"><ul id="hits" hidden></ul></div>
+  <button id="theme" type="button" aria-label="Toggle colour theme">theme</button>
+</div></header>
+<div class="wrap docs"><nav class="side" aria-label="Documentation"><h2>Start</h2><ul><li><a href="install.html">Install</a></li><li><a href="usage.html">Usage</a></li></ul><h2>Reference</h2><ul><li><a href="how-it-works.html">How it works</a></li><li><a href="platforms.html">Platforms</a></li><li><a href="verification.html">Verification</a></li><li><a href="faq.html">FAQ and troubleshooting</a></li></ul><h2>Project</h2><ul><li><a href="upgrading.html">Upgrading</a></li><li><a href="releases.html" aria-current="page">Releases</a></li><li><a href="contributing.html">Contributing</a></li></ul></nav><main id="main"><article class="doc"><h1>Releases</h1><p class="lead">The full history is <a href="https://github.com/denji/cpulimit/blob/master/CHANGELOG.md">CHANGELOG.md</a>. The command-line interface and the exit statuses documented in <code>man cpulimit</code> are the public interface that 1.x keeps stable (<a href="https://semver.org/">semantic versioning</a>).</p>
+
+<div class="grid">
+  <div class="card"><h3>1.0.3 <span class="tag">2026-10-28</span></h3><p>OpenBSD and NetBSD support, one shared selection of a process and its descendants for all iterators, a FreeBSD iterator that follows the whole tree under <code>-i</code> (it stopped at the direct children before), clang-format, a wider CI matrix of virtual machines. Options, exit statuses and log text unchanged.</p></div>
+  <div class="card"><h3>1.0.2 <span class="tag">2026-10-24</span></h3><p>Source tree reorganized by role, CI and benchmark workflows repaired, CBMC moved to its own workflow. No change to options, exit statuses or log text.</p></div>
+  <div class="card"><h3>1.0.1 <span class="tag">2026-10-22</span></h3><p>The bounded model checker found a real defect: <code>compute_slices()</code> computed <code>0 / NaN</code> and cleaned it up afterwards. It now never produces a NaN; the result is identical for every input. Verification harnesses reworked.</p></div>
+  <div class="card"><h3>1.0.0 <span class="tag">2026-10-21</span></h3><p>First release of the fork: daemon mode, syslog, pid file, single-limiter lock, single-process command mode, strict option parsing, pid and start-time identity, a rewritten <code>/proc</code> reader, a non-recursive build, GitHub Actions instead of Travis.</p></div>
+</div>
+<p>Moving between versions: <a href="upgrading.html">Upgrading</a>.</p>
+
+<h2 id="verify">Verify a download</h2>
+<p>Release assets are static musl binaries named <code>cpulimit-ARCH-linux-musl</code>, each with a <code>.sha256</code> file. The release workflow has not produced a release yet; if the <a href="https://github.com/denji/cpulimit/releases">releases page</a> lists assets, check them like this:</p>
+<div class="cp"><pre><code>sha256sum -c cpulimit-x86_64-linux-musl.sha256
+chmod +x cpulimit-x86_64-linux-musl &amp;&amp; ./cpulimit-x86_64-linux-musl -V</code></pre></div>
+<p>The checksum guards against a damaged download, not against a compromised release page. Building from source remains the reference: <code>make &amp;&amp; make check &amp;&amp; sudo make install</code>.</p>
+<nav class="pager" aria-label="Previous and next page"><a rel="prev" href="upgrading.html"><small>Previous</small>Upgrading</a><a rel="next" href="contributing.html"><small>Next</small>Contributing</a></nav></article></main></div>
+<footer><div class="wrap">
+  <p>cpulimit 1.0.3 · GPL-2.0-or-later · <a href="https://github.com/denji/cpulimit/blob/master/CHANGELOG.md">changelog</a> · <a href="https://github.com/denji/cpulimit/issues">report a problem</a>. Page <a href="https://github.com/denji/cpulimit/blob/gh-pages/content/releases.html">source</a>.</p>
+  <p>Originally by Angelo Marletta; this fork is maintained at <a href="https://github.com/denji/cpulimit">denji/cpulimit</a>. Contributors: <a href="https://github.com/denji/cpulimit/blob/master/AUTHORS">AUTHORS</a>. The site is built from <code>content/</code>, <code>site.json</code> and <code>data/results.json</code> by <code>tools/build.py</code>.</p>
+</div></footer>
+<script src="site.js" defer></script>
+</body>
+</html>

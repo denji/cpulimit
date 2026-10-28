@@ -1,0 +1,54 @@
+<!--meta title="Verification" desc="What is tested in cpulimit, how, with what results, and what is not verified." section="Reference" order="30" -->
+<p class="lead">Everything here is in the repository and wired into CI. Nothing is claimed as proved beyond what the tools actually reported, and the limits are listed next to the results.</p>
+
+<h2 id="status">Current status</h2>
+<p><a href="{{repo}}/actions"><img alt="CI status" src="{{repo}}/actions/workflows/ci.yml/badge.svg?branch=master" height="20"></a> <a href="{{repo}}/actions"><img alt="verify status" src="{{repo}}/actions/workflows/verify.yml/badge.svg?branch=master" height="20"></a> The results of every run are on the Actions page; this page does not copy them. Figures below were measured on a Linux x86_64 development host unless they say otherwise.</p>
+
+<h2 id="techniques">Techniques</h2>
+<div class="tw"><table>
+  <tr><th>Technique</th><th>Covers</th></tr>
+  <tr><td>Unit, CLI and integration tests (<code>make check</code>)</td><td>controller, <code>/proc</code> parser, process table, list, CLI, lock, snapshot selection, and 55 end-to-end checks with real processes</td></tr>
+  <tr><td>Sanitizers</td><td>ASan and UBSan on gcc and clang; clang's integer sanitizers</td></tr>
+  <tr><td>Fuzzing</td><td>the stat parser and the CLI parser against stated properties, not only "no crash" (libFuzzer in CI, a standalone driver locally)</td></tr>
+  <tr><td>Bounded model checking</td><td>CBMC harnesses for the controller invariants, tick conversion and the <code>/proc</code> parser (<code>cbmc.yml</code>, manual and weekly). <span class="tag w">experimental</span> The same harnesses run as random tests on every push (<code>make verif-sim</code>).</td></tr>
+  <tr><td>Mutation testing</td><td>defects re-introduced one at a time, each of which must fail a unit test: {{mutants}} mutants, all detected locally</td></tr>
+  <tr><td>Coverage</td><td>gcov line and branch coverage with an 85 % line gate</td></tr>
+  <tr><td>Stress and valgrind</td><td>fork/exit churn under <code>-i</code> with 300 children: no leaks, flat memory, nothing left stopped</td></tr>
+  <tr><td>Static analysis</td><td><code>gcc -fanalyzer</code> (must be silent), clang-tidy, cppcheck, scan-build, CodeQL</td></tr>
+  <tr><td>Format</td><td>clang-format 18 checked in CI (<code>make format-check</code>)</td></tr>
+  <tr><td>Portability</td><td>CI matrix of OS, compiler, libc and architecture; the experimental <a href="platforms.html#vm">vm workflow</a></td></tr>
+</table></div>
+
+<h2 id="measurements">Measurements</h2>
+<p>Every number is in <a href="{{repo}}/blob/gh-pages/data/results.json">data/results.json</a> with where and when it was measured, and the charts are drawn from that file by <code>tools/charts.py</code>. They are single runs on a 2-CPU virtual machine with a 10 ms clock tick: treat differences of a point or two as noise.</p>
+<figure><!--chart:accuracy-->
+  <figcaption><strong>Accuracy.</strong> A one-thread busy loop under <code>-l N</code>, 8 s per case. The two versions are the same within noise: both overshoot near 50 % and under-deliver at 10 % and 25 %, because they share one controller. Nothing here is an improvement.</figcaption></figure>
+<figure style="margin-top:2rem"><!--chart:overhead-->
+  <figcaption><strong>Overhead.</strong> The gain is in what the limiter itself costs: fewer system calls, and half the CPU with 200 children under <code>-i</code>. The single-target CPU figure is close to the noise floor (an earlier run measured the baseline at 0.12 %), so only the system-call and <code>-i</code> rows were stable across runs. Measured on 1.0.0 against upstream 0.3.2 and not repeated for later releases.</figcaption></figure>
+<figure style="margin-top:2rem"><!--chart:coverage-->
+  <figcaption><strong>Coverage</strong> ({{coverage_source}}). <code>runtime/daemon.c</code> and <code>main.c</code> are the weakest; they hold the process and signal plumbing that is hardest to drive from tests.</figcaption></figure>
+
+<h2 id="found">Bugs found by the process</h2>
+<ul>
+  <li>The bounded model checker found <code>compute_slices()</code> computing <code>0 / NaN</code> and cleaning it up afterwards (fixed in 1.0.1, the result is identical for every input).</li>
+  <li>Property checks found <code>ticks_to_ms()</code> returning a negative number for <code>ticks = 2^63 + 1</code> at 1000 Hz and saturating wrongly above 1.8e16 ticks per second (neither reachable with a real clock rate).</li>
+  <li>The OpenBSD runs exposed that <code>p_rtime</code> only advances in scheduling-quantum steps and that zombies are listed; both are fixed and explained under <a href="platforms.html#notes">platform notes</a>.</li>
+</ul>
+
+<h2 id="not-verified">Not verified</h2>
+<div class="callout warn">
+  <ul>
+    <li><strong>Nothing is "proved".</strong> One CBMC harness has finished (the field positions of a well-formed stat line, within its bounds, CI run 39890593464); the others were narrowed and have no verdict yet. The harnesses cover three pure functions, not the control loop or signal handling.</li>
+    <li>macOS, FreeBSD, NetBSD and Solaris/illumos code has not been run by hand; see the <a href="platforms.html#matrix">platform table</a> for what CI ran.</li>
+    <li>musl on non-x86 runs under qemu-user, which fakes parts of <code>/proc</code>; some process-name tests are skipped there.</li>
+    <li>Real syslog delivery is not tested. No ACSL/Frama-C specification exists, and AFL++ was not run.</li>
+    <li>The benchmark was measured once on a shared VM, on 1.0.0.</li>
+  </ul>
+</div>
+
+<h2 id="repro">Reproduce</h2>
+<div class="cp"><pre><code>make check analyze verif-sim format-check     <span class="c"># what a change must pass</span>
+sh tools/mutation.sh                          <span class="c"># mutants; every one must be killed</span>
+make coverage                                 <span class="c"># gcov, with the 85 % gate</span>
+make stress                                   <span class="c"># churn, 300 children, valgrind</span>
+make bench BASELINE=/path/to/old/cpulimit     <span class="c"># two binaries back to back</span></code></pre></div>

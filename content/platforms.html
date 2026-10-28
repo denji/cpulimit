@@ -1,0 +1,42 @@
+<!--meta title="Platforms" desc="Which operating systems cpulimit supports, what is tested on each, and what is not." section="Reference" order="20" -->
+<p class="lead">A process iterator exists for Linux, macOS, FreeBSD, OpenBSD, NetBSD and Solaris/illumos. How much each has been run differs a lot, and this page says so instead of rounding up.</p>
+
+<h2 id="matrix">Status</h2>
+<div class="tw"><table>
+  <tr><th>Platform</th><th>Status</th><th>Evidence</th></tr>
+  <tr><td>Linux, glibc</td><td><span class="tag ok">tested</span></td><td>CI on x86_64 and arm64; gcc and clang; <code>-O0</code>, <code>-O2</code>, <code>-O3</code>; <code>-std=gnu99</code> to <code>gnu2x</code>; sanitizers, valgrind, fuzzing, stress</td></tr>
+  <tr><td>Linux, musl</td><td><span class="tag ok">CI</span></td><td>x86_64, i386, arm64, armv7, ppc64le, s390x, riscv64 (qemu-user except x86_64, which fakes parts of <code>/proc</code>)</td></tr>
+  <tr><td>macOS 14, 15</td><td><span class="tag w">unit tests</span></td><td>CI builds and runs the unit tests, not the integration tests. The job does not gate a release.</td></tr>
+  <tr><td>OpenBSD 7.9, 8.0</td><td><span class="tag w">unit tests</span></td><td>CI builds with <code>-Werror</code> and runs the unit tests and the command-mode tests in a VM. 7.9 passes; on 8.0 one timing bound failed once and was relaxed, so 8.0 is not yet confirmed with the final code. Does not gate a release.</td></tr>
+  <tr><td>FreeBSD 14, 15</td><td><span class="tag w">builds</span></td><td>CI builds on 14.1; the <code>vm</code> workflow (manual and weekly) builds and tests 14.5 and 15.1. The iterator was reworked in 1.0.3 and has not been run on FreeBSD since.</td></tr>
+  <tr><td>NetBSD 10, 11</td><td><span class="tag w">not yet run</span></td><td>Written from the NetBSD sources, sharing code with OpenBSD. Some facts (zombie status value, the clock rate source) are assumptions until the first run.</td></tr>
+  <tr><td>HardenedBSD, GhostBSD</td><td><span class="tag w">report only</span></td><td>Built by the <code>vm</code> workflow; they should select the FreeBSD code.</td></tr>
+  <tr><td>Solaris, OmniOS, OpenIndiana</td><td><span class="tag w">never run</span></td><td>An iterator was contributed by Jim Mason; it has never been compiled in CI. The <code>vm</code> workflow is the first attempt, and its compiler package names are guesses.</td></tr>
+  <tr><td>DragonFly BSD</td><td><span class="tag">unsupported</span></td><td>No iterator. Its <code>kinfo_proc</code> and clock units are not confirmed.</td></tr>
+  <tr><td>GNU/Hurd, Haiku</td><td><span class="tag">unsupported</span></td><td>Probed only. Haiku's team info has no parent pid, so <code>-i</code> cannot work there as designed.</td></tr>
+</table></div>
+<p>"Does not gate a release" means a failure of that job is reported but does not stop a tag from producing release assets. The current results of every job are on the <a href="{{repo}}/actions">Actions page</a>; this page does not copy them.</p>
+
+<h2 id="vm">The <code>vm</code> workflow</h2>
+<p>Hosted CI has no BSD or illumos runners, so the repository runs those systems in QEMU virtual machines (the <code>vmactions</code> actions). The workflow <code>vm.yml</code> is experimental and report only: it runs by hand (<em>Actions → vm → Run workflow</em>) and weekly. Each job builds, runs the unit tests and copies its transcript back, which is shown as an annotation on the run, so a failure can be read without opening raw logs. It also runs the full suite, integration tests included, on Debian for riscv64, ppc64le and aarch64 under system emulation, where <code>/proc</code> is real, and probes GNU/Hurd and Haiku.</p>
+
+<h2 id="notes">Platform notes</h2>
+<h3>OpenBSD and NetBSD</h3>
+<ul>
+  <li>No libkvm and no special group: the iterator reads <code>sysctl kern.proc</code> (NetBSD: <code>kern.proc2</code>).</li>
+  <li>CPU time comes from the statistics tick counters, divided by the statistics clock rate. They are sampled at randomised instants, so one 50 ms sample can show five to seven ticks; the unit test allows for that on OpenBSD (usage bound 1.7 instead of 1.2).</li>
+  <li>Zombies are listed by the kernel and are skipped (<code>p_stat</code> dead/zombie). Without that, command mode waited on children that had already ended.</li>
+</ul>
+<h3>macOS</h3>
+<ul>
+  <li>CPU time is reported in mach absolute time units, which are nanoseconds on Intel but not on Apple silicon; the iterator converts with the timebase.</li>
+  <li>Inspecting another user's process needs privilege; a process that cannot be inspected is skipped.</li>
+</ul>
+<h3>Linux containers</h3>
+<ul>
+  <li>The target must be visible in your PID namespace and signalable. Inside a container, <code>-e</code> matches processes of that container only.</li>
+  <li>If the container's cgroup has a CPU quota, that quota applies as well; cpulimit adds to it, it does not replace it.</li>
+</ul>
+
+<h2 id="adding">Adding a platform</h2>
+<p>A port is one file, <code>src/platform/&lt;os&gt;/iterator.c</code>, plus a branch in <code>src/platform/iterator.c</code>. It must provide <code>init_process_iterator</code>, <code>get_next_process</code> and <code>close_process_iterator</code> and fill <code>struct process</code> (pid, parent pid, a start time that is only ever compared for equality, CPU time in milliseconds). Take a snapshot if the system allows it and call <code>snapshot_select()</code> for the filter; skip zombies and kernel threads. The checklist is in <a href="contributing.html#port">Contributing</a>.</p>

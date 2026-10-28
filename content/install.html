@@ -1,0 +1,40 @@
+<!--meta title="Install" desc="Build and install cpulimit from source, make a static binary, package it, and check what is tested on your system." section="Start" order="10" -->
+<p class="lead">cpulimit builds with GNU make and any C99 compiler. It has no dependencies beyond the C library (and <code>libkvm</code> on FreeBSD).</p>
+
+<h2 id="build">Build and install</h2>
+<div class="cp"><pre><code>git clone {{repo}}.git
+cd cpulimit
+make                      <span class="c"># binary in build/cpulimit (copied to src/cpulimit)</span>
+make check                <span class="c"># unit, CLI and integration tests</span>
+sudo make install         <span class="c"># /usr/local/bin/cpulimit and the man page</span></code></pre></div>
+<p>On FreeBSD, OpenBSD, NetBSD and illumos the GNU make is <code>gmake</code> (<code>pkg install gmake</code>, <code>pkg_add gmake</code>); the plain <code>make</code> of those systems cannot read the Makefile.</p>
+
+<h3 id="variables">Variables</h3>
+<div class="tw"><table>
+  <tr><th>Variable</th><th>Default</th><th>Meaning</th></tr>
+  <tr><td><code>PREFIX</code></td><td><code>/usr/local</code></td><td>install prefix; <code>BINDIR</code> and <code>MANDIR</code> derive from it</td></tr>
+  <tr><td><code>DESTDIR</code></td><td>empty</td><td>staging root for packagers</td></tr>
+  <tr><td><code>CC</code>, <code>CFLAGS</code>, <code>CPPFLAGS</code>, <code>LDFLAGS</code></td><td><code>-O2 -g</code></td><td>yours are never overridden: the flags the program needs (<code>-D_GNU_SOURCE</code>, <code>-Wall -Wextra</code>) are kept apart from them</td></tr>
+  <tr><td><code>BUILD</code></td><td><code>build</code></td><td>object and output directory; the build is non-recursive and rebuilds when the compiler or any flag changes</td></tr>
+  <tr><td><code>WERROR=1</code></td><td>off</td><td>turn warnings into errors (what CI uses)</td></tr>
+  <tr><td><code>STATIC_CC</code></td><td><code>musl-gcc</code></td><td>compiler for <code>make static</code></td></tr>
+</table></div>
+<p><code>make install</code> never calls <code>sudo</code> itself. <code>make uninstall</code> removes what it installed.</p>
+
+<h2 id="static">Static binary</h2>
+<div class="cp"><pre><code>make static STATIC_CC=musl-gcc    <span class="c"># build/static/cpulimit, no shared libraries</span>
+make static-install</code></pre></div>
+<p>The static build uses its own object directory, so it never mixes with a dynamic one.</p>
+
+<h2 id="release-binaries">Release binaries</h2>
+<p>Tagged releases are meant to carry static musl binaries (x86_64, aarch64, armv7, i686, ppc64le, s390x, riscv64) with a <code>.sha256</code> file each. The release workflow has not produced a release yet, so look at the <a href="{{repo}}/releases">releases page</a> to see whether one exists for your version before relying on it. How to check a download: <a href="releases.html#verify">Releases</a>.</p>
+
+<h2 id="packagers">Notes for packagers</h2>
+<ul>
+  <li>The man page is hand written (<code>man/cpulimit.1</code>) and installed by <code>make install</code>; <code>make man</code> only checks that it formats.</li>
+  <li><code>make check</code> needs <code>/proc</code> (Linux) or the platform's process interface; the integration tests start real processes. <code>SKIP_INTEGRATION=1</code> runs only the unit tests, and <code>CPULIMIT_SKIP_TIMING=1</code> skips the checks that depend on CPU accounting being accurate (emulated CPUs, busy shared builders).</li>
+  <li>The version is in three places that a test keeps equal: <code>src/cli/cli.c</code>, the man page header and the top of <code>CHANGELOG.md</code>.</li>
+</ul>
+
+<h2 id="platforms-short">Which systems are tested</h2>
+<p>All of Linux (glibc and musl), macOS, FreeBSD, OpenBSD and NetBSD have a process iterator; the honest version of how much each was run is on the <a href="platforms.html">platforms page</a>. Short form: Linux is tested heavily, macOS and OpenBSD run the unit tests in CI, FreeBSD and the other BSDs are built and report their results to a non-gating workflow, and NetBSD and Solaris/illumos have not yet been confirmed on a real system.</p>
