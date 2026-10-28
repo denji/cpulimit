@@ -7,6 +7,15 @@ documented in `man cpulimit` are the public interface that 1.x keeps stable.
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-10-28
+
+New platforms (OpenBSD, NetBSD), one shared way for the iterators to find a process and its
+descendants, a FreeBSD iterator that no longer misses grandchildren, a formatter and a wider CI
+matrix. Options, exit statuses and log text are unchanged; the throttling logic is the 1.0.2 logic.
+
+Upgrading from 1.0.2: nothing to do. On FreeBSD, `-i` now limits the whole process tree, as on
+Linux (see Fixed).
+
 ### Added
 - OpenBSD support: a process iterator over `sysctl` (`src/platform/openbsd/iterator.c`, no libkvm)
   and an OpenBSD CI job (8.0 and 7.9). CPU time is read from the statistics tick counters,
@@ -165,7 +174,8 @@ First release of the fork after the redesign. Starts from the upstream 0.3.2 cod
 - The release workflow (static musl binaries for seven architectures) had not been run when this
   entry was written.
 
-[Unreleased]: https://github.com/denji/cpulimit/compare/1.0.2...HEAD
+[Unreleased]: https://github.com/denji/cpulimit/compare/1.0.3...HEAD
+[1.0.3]: https://github.com/denji/cpulimit/releases/tag/1.0.3
 [1.0.2]: https://github.com/denji/cpulimit/releases/tag/1.0.2
 [1.0.1]: https://github.com/denji/cpulimit/releases/tag/1.0.1
 [1.0.0]: https://github.com/denji/cpulimit/releases/tag/1.0.0

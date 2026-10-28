@@ -81,7 +81,7 @@ static void test_help_and_version(void) {
     CHECK(RUN(c, m, "cpulimit", "-h") == CLI_HELP);
     CHECK(RUN(c, m, "cpulimit", "--help") == CLI_HELP);
     CHECK(RUN(c, m, "cpulimit", "-l", "abc", "-h") == CLI_HELP); /* help wins over later validation, as it always did */
-    CHECK(strcmp(cli_version(), "1.0.2") == 0);
+    CHECK(strcmp(cli_version(), "1.0.3") == 0);
 }
 
 static void test_limit(void) {
