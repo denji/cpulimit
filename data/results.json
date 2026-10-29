@@ -44,7 +44,7 @@
     ]
   },
   "coverage": {
-    "source": "tools/coverage.sh (gcov), 2026-10-28, make coverage on 1.0.3 including daemon children",
+    "source": "tools/coverage.sh (gcov), 2026-10-29, make coverage on 1.0.3 including daemon children",
     "gate_lines": 85,
     "files": [
       {
@@ -75,7 +75,7 @@
       {
         "name": "core/process_group.c",
         "lines": 96.9,
-        "branches": 85.4
+        "branches": 86.5
       },
       {
         "name": "runtime/log.c",
@@ -99,8 +99,8 @@
       },
       {
         "name": "main.c",
-        "lines": 80.1,
-        "branches": 68.3
+        "lines": 82.5,
+        "branches": 74.3
       },
       {
         "name": "runtime/daemon.c",
@@ -108,7 +108,7 @@
         "branches": 55.3
       }
     ],
-    "total_lines": 89.6,
-    "total_branches": 79.5
+    "total_lines": 90.1,
+    "total_branches": 80.9
   }
 }

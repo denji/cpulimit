@@ -7,7 +7,7 @@ pkill -CONT -f 'the command line'     <span class="c"># or by name</span></code>
 
 <h2 id="no-effect">The limit seems to have no effect</h2>
 <ul>
-  <li><strong>Another user's process.</strong> If cpulimit cannot signal it, it drops it as if it had exited. Run with <code>-v</code> and look for <code>SIGSTOP failed. Process N dead!</code>; run as that user or as root.</li>
+  <li><strong>Another user's process.</strong> If cpulimit may not signal it, it says <code>Process found but you aren't allowed to control it</code> and does nothing. Run it as that user or as root.</li>
   <li><strong>The percentage is of one CPU.</strong> <code>-l 50</code> on a program using four threads still allows half a CPU in total; <code>-l 200</code> allows two.</li>
   <li><strong>The children are not included.</strong> A shell script's work happens in its children: add <code>-i</code>.</li>
   <li><strong><code>-m</code> is too high.</strong> Processes using less than M of a CPU are never stopped. Remember <code>-m 0.05</code> is 5 %, not <code>-m 5</code>.</li>
@@ -22,6 +22,9 @@ pkill -CONT -f 'the command line'     <span class="c"># or by name</span></code>
 
 <h2 id="threads">Does it limit threads separately?</h2>
 <p>No. The target is limited as a whole: the signals go to the process, so all of its threads stop and continue together. A two-thread busy loop at <code>-l 50</code> measured 53 to 54 % of one CPU over 10 s, with the old and the new binary alike.</p>
+
+<h2 id="wrappers">Does it work with nice, ionice, taskset, chrt, timeout?</h2>
+<p>Yes, and the integration tests check each: a target started under <code>nice</code>, <code>ionice</code>, <code>taskset</code> or <code>chrt</code> is limited and keeps its nice value, I/O class, CPU affinity and scheduling policy; <code>cpulimit -l N nice -n 5 cmd</code> limits <code>cmd</code> (the wrapper replaces itself with the command, so cpulimit's child is the command) and returns its exit status. A wrapper that stays alive and forks, such as <code>timeout</code> or <code>setsid -w</code>, is the child cpulimit sees: add <code>-i</code> to reach the command below it. Running cpulimit itself under <code>nice</code>, <code>ionice</code> or <code>taskset</code> works too; a nice value you give it is kept with <code>--no-boost</code> and may be improved without it, if you have the privilege.</p>
 
 <h2 id="vs">Why not nice, cgroups or a scheduler class?</h2>
 <p><code>nice</code> only changes who wins when the CPU is contended; an idle machine still gives the process all of it. cgroup CPU quotas (<code>cpu.max</code>, <code>systemd-run -p CPUQuota=</code>) are the right tool on Linux when you control the service and have the privilege; they are enforced by the kernel and need no cpulimit process. cpulimit is for the cases where those are unavailable or too heavy: an already running process, another unix, a user without cgroup delegation, or a quick cap on one command.</p>

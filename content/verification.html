@@ -7,7 +7,7 @@
 <h2 id="techniques">Techniques</h2>
 <div class="tw"><table>
   <tr><th>Technique</th><th>Covers</th></tr>
-  <tr><td>Unit, CLI and integration tests (<code>make check</code>)</td><td>controller, <code>/proc</code> parser, process table, list, CLI, lock, snapshot selection, and 55 end-to-end checks with real processes</td></tr>
+  <tr><td>Unit, CLI and integration tests (<code>make check</code>)</td><td>controller, <code>/proc</code> parser, process table, list, CLI, lock, snapshot selection, 55 end-to-end checks with real processes, and 123 checks of cpulimit together with <code>nice</code>, <code>ionice</code>, <code>taskset</code>, <code>chrt</code>, <code>env</code>, <code>nohup</code>, <code>timeout</code> and <code>setsid</code></td></tr>
   <tr><td>Sanitizers</td><td>ASan and UBSan on gcc and clang; clang's integer sanitizers</td></tr>
   <tr><td>Fuzzing</td><td>the stat parser and the CLI parser against stated properties, not only "no crash" (libFuzzer in CI, a standalone driver locally)</td></tr>
   <tr><td>Bounded model checking</td><td>CBMC harnesses for the controller invariants, tick conversion and the <code>/proc</code> parser (<code>cbmc.yml</code>, manual and weekly). <span class="tag w">experimental</span> The same harnesses run as random tests on every push (<code>make verif-sim</code>).</td></tr>
