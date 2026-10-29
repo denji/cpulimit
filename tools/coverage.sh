@@ -16,6 +16,10 @@ mkdir -p "$BUILD"
 make -s CC="$CC" BUILD="$BUILD" CFLAGS="-O0 -g --coverage -fprofile-update=atomic -DCL_COVERAGE" \
     LDFLAGS="--coverage" all "$BUILD/test/busy" "$BUILD/test/spawn" \
     $(for t in process_iterator util limiter procfs_parse snapshot group list cli_parse lock; do printf '%s ' "$BUILD/test/${t}_test"; done) >/dev/null
+# the wrapper test also runs a limiter as an unprivileged user (when it is root): that process
+# must be able to write its .gcda counters next to the objects
+chmod -R a+rwX "$BUILD" 2>/dev/null || true
+umask 000   # and counters created by root's processes must be updatable by that user's
 BUILD="$BUILD" sh test/run_tests.sh >"$BUILD/test.log" 2>&1 || { tail -20 "$BUILD/test.log"; echo "coverage: tests failed" >&2; exit 1; }
 BUILD=$(cd "$BUILD" && pwd)
 cd "$BUILD"

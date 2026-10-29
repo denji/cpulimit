@@ -7,6 +7,20 @@ documented in `man cpulimit` are the public interface that 1.x keeps stable.
 
 ## [Unreleased]
 
+### Tests
+- `test/integration/wrapper_test.sh` (123 checks): cpulimit together with `nice`, `ionice`,
+  `taskset`, `chrt`, `env`, `nohup`, `timeout` and `setsid`. A target started under a wrapper is
+  limited and keeps its nice value, I/O class, CPU affinity and scheduling policy; command mode
+  through a wrapper limits the command and returns its exit status; `-i` follows descendants
+  through wrappers that fork; cpulimit itself under `nice`/`ionice`/`taskset` works; `--no-boost`
+  leaves its priority alone and the default boost reports what it did; a target killed while
+  limited ends the limiter; `timeout` ending the limiter does not strand the target; and, when run
+  as root with `setpriv`, a limiter as an unprivileged user limits its own user's process, cannot
+  raise its priority and refuses another user's process. A wrapper that is missing or not
+  permitted is skipped. The shared helpers moved to `test/integration/lib.sh`.
+- Coverage is 90.1 % of lines and 80.9 % of branches (89.6 % and 79.5 % in 1.0.3).
+  `tools/coverage.sh` lets processes of another user write their counters.
+
 ## [1.0.3] - 2026-10-28
 
 New platforms (OpenBSD, NetBSD), one shared way for the iterators to find a process and its

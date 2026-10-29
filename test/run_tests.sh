@@ -46,6 +46,7 @@ if [ -n "${SKIP_INTEGRATION:-}" ]; then
     printf 'SKIP  integration_test (SKIP_INTEGRATION set)\n'
 else
     run integration_test env BUILD="$BUILD" sh "$dir/integration/integration_test.sh"
+    run wrapper_test env BUILD="$BUILD" sh "$dir/integration/wrapper_test.sh"
 fi
 
 printf '\n%d test(s), %d failed\n' "$total" "$failed"
